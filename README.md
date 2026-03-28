@@ -1,5 +1,4 @@
-# 🖐️ HandTrack Intelligence: High-Performance Vision Hub
-
+# 🖐️ Real-Time Hand Tracking Visualization using MediaPipe & TouchDesigner
 Elevate your vision experience with real-time hand tracking, gesture-driven OSC streaming, and a cinematic authenticated dashboard. Powered by **MediaPipe**, **OpenCV**, and **Flask**.
 
 ![Liquid Intelligence](https://img.shields.io/badge/Status-Premium-gold?style=for-the-badge)
