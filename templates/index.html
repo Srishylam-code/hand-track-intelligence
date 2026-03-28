@@ -292,135 +292,42 @@
   <!-- THE EXPERIENCE / VIDEO -->
   <section class="video-section gs-reveal" id="experience">
     <span class="hero-pre" style="text-align: center;">Live Pipeline</span>
-    <h2 style="text-align: center; margin-bottom: 10px; font-size: clamp(1.5rem, 3vw, 2.5rem);">Seamless Biometric Translation</h2>
-    
-    <!-- Camera Connect UI -->
-    <div style="text-align: center; margin-bottom: 50px;">
-      <p style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">Primary Input Source</p>
-      <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; align-items: center;">
-        <button onclick="setCamera(0)" class="btn btn-accent" style="padding: 12px 30px; font-size: 0.8rem; border-radius:100px;">💻 Laptop Camera</button>
-      </div>
-    </div>
+    <h2 style="text-align: center; margin-bottom: 10px; font-size: clamp(1.5rem, 3vw, 2.5rem);">Backend-Compatible Deployment Mode</h2>
 
     <div class="video-wrapper">
-      <div class="live-badge" id="live-badge" style="display: none;"><div class="live-dot"></div> Live Socket</div>
-      <div class="video-container" id="video-container">
-        <!-- Standby UI -->
-        <div id="video-standby" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); z-index: 5;">
-          <i class="fa-solid fa-video-slash" style="font-size: 4rem; color: var(--text-muted); margin-bottom: 20px;"></i>
-          <p style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.2em;">Pipeline Standby</p>
-          <button onclick="startPipeline()" class="btn btn-accent" style="margin-top: 30px; padding: 15px 35px;">
-            <i class="fa-solid fa-play"></i> Run Pipeline
-          </button>
+      <div class="video-container" style="display:flex; align-items:center; justify-content:center; padding:50px 30px;">
+        <div style="max-width:760px; text-align:center; z-index:2;">
+          <i class="fa-solid fa-cloud-arrow-up" style="font-size:4rem; color:var(--accent); margin-bottom:24px;"></i>
+          <p style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.18em; margin-bottom:16px;">Render Deployment</p>
+          <p style="font-size:1.05rem; color:var(--text-main); margin-bottom:16px;">
+            This cloud deployment runs as a Flask backend only. Local webcam capture, OpenCV preview windows,
+            and GUI-based pipeline controls are disabled to keep the service compatible with Render.
+          </p>
+          <p id="runtime-message" style="font-size:0.95rem; color:var(--text-muted); margin-bottom:28px;">
+            Checking backend runtime status...
+          </p>
+          <div style="display:flex; gap:18px; justify-content:center; flex-wrap:wrap;">
+            <a href="/health" class="btn btn-accent">Health Check</a>
+            <a href="https://render.com/docs" target="_blank" class="btn">Render Docs</a>
+          </div>
         </div>
-        <!-- Live OpenCV Feed -->
-        <img id="video-feed-img" src="" alt="Neural Hand Tracking Live Stream" style="display: none;" />
       </div>
-    </div>
-
-    <!-- Control Buttons -->
-    <div style="margin-top: 30px; display: flex; gap: 20px; justify-content: center;">
-        <button id="btn-stop-pipeline" onclick="stopPipeline()" class="btn" style="display: none; border-color: #ff4d6d; color: #ff4d6d;">
-            <i class="fa-solid fa-stop"></i> Stop / Cancel
-        </button>
     </div>
 
     <script>
-      async function startPipeline() {
+      async function loadRuntimeStatus() {
+        const message = document.getElementById('runtime-message');
         try {
-          console.log("[UI] Requesting backend to start pipeline...");
-          
-          // Force back to Laptop Camera (0) before starting
-          await fetch('/set_camera', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: 0 })
-          });
-
-          const res = await fetch('/set_camera', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: 'start' })
-          });
-          
-          if (res.ok) {
-            document.getElementById('video-standby').style.display = 'none';
-            const img = document.getElementById('video-feed-img');
-            img.src = '/video_feed?t=' + Date.now();
-            img.style.display = 'block';
-            document.getElementById('live-badge').style.display = 'flex';
-            document.getElementById('btn-stop-pipeline').style.display = 'inline-block';
-          }
+          const res = await fetch('/runtime-status');
+          const data = await res.json();
+          message.textContent = data.message || 'Backend runtime is available.';
         } catch (err) {
-          console.error("[UI] Error starting pipeline:", err);
+          message.textContent = 'Backend status endpoint is unavailable right now.';
         }
       }
 
-      // Cleanup: remove browser detection listeners
-      navigator.mediaDevices.ondevicechange = null;
-
-      async function stopPipeline() {
-        try {
-          const res = await fetch('/set_camera', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: 'stop' })
-          });
-
-          if (res.ok) {
-            document.getElementById('video-standby').style.display = 'flex';
-            document.getElementById('video-feed-img').style.display = 'none';
-            document.getElementById('video-feed-img').src = '';
-            document.getElementById('live-badge').style.display = 'none';
-            document.getElementById('btn-stop-pipeline').style.display = 'none';
-          }
-        } catch (err) {
-          console.error("[UI] Error stopping pipeline:", err);
-        }
-      }
-
-      function syncSelectedCamera() {
-          // No-op - feature removed
-      }
-
-      function setCamera(source) {
-        console.log(`[UI] Setting camera to index/source: ${source}`);
-        fetch('/set_camera', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: source })
-        })
-        .then(r => r.json())
-        .then(data => {
-            console.log('Camera source updated:', data);
-            
-            // Immediately trigger a 'start' command to refresh the backend loop with new source
-            return fetch('/set_camera', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ source: 'start' })
-            });
-        })
-        .then(() => {
-            const img = document.getElementById('video-feed-img');
-            if (img.style.display === 'block') {
-               img.src = '/video_feed?t=' + Date.now();
-            } else {
-               // If not running yet, just alert
-               alert(`Switched to Camera Device ${source}. Click RUN PIPELINE below!`);
-            }
-        })
-        .catch(e => console.error(e));
-      }
-      
-      function connectIPCamera() {
-        const url = prompt("Enter IP Camera URL (e.g., http://192.168.1.15:8080/video)", "http://192.168.1.15:8080/video");
-        if (url && url.trim() !== "") {
-          setCamera(url.trim());
-        }
-      }
+      loadRuntimeStatus();
     </script>
-
   </section>
 
   <!-- VISION / ABOUT -->
