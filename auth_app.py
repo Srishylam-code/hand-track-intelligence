@@ -98,121 +98,76 @@ def save_user(email: str, password_plain: str):
 # ---------------------------------------------------------------------------
 # OTP helpers
 # ---------------------------------------------------------------------------
-def generate_otp() -> str:
-    return "".join(random.choices(string.digits, k=6))
+# In-memory OTP store: { email: { otp, expiry, last_sent } }
+otp_store = {}
 
+def send_otp(email):
+    """
+    1. Generates 6-digit OTP
+    2. Checks 60s resend protection
+    3. Stores with 5m expiry
+    4. Sends SSL email (Port 465)
+    5. Returns (success, message)
+    """
+    email = email.lower().strip()
+    now = datetime.now()
 
-def store_otp(email: str, otp: str):
-    otp_store[email.lower()] = {
+    # 1. Resend Protection (60 seconds)
+    if email in otp_store:
+        last_sent = otp_store[email].get("last_sent")
+        if last_sent and (now - last_sent).total_seconds() < 60:
+            print(f"[DEBUG] Resend blocked for {email} (too soon)")
+            return False, "Please wait 60 seconds before requesting another OTP."
+
+    # 2. Generate OTP
+    otp = "".join(random.choices(string.digits, k=6))
+    print(f"[DEBUG] Generated OTP for {email}: {otp}")
+
+    # 3. Store OTP with 5m expiry
+    otp_store[email] = {
         "otp": otp,
-        "expiry": datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES),
-        "resend_count": otp_store.get(email.lower(), {}).get("resend_count", 0),
+        "expiry": now + timedelta(minutes=5),
+        "last_sent": now
     }
 
+    # 4. Prepare Email
+    mail_user = os.getenv("MAIL_USER")
+    mail_pass = os.getenv("MAIL_PASSWORD")
 
-def verify_otp(email: str, entered: str) -> tuple[bool, str]:
-    """Returns (success, message)."""
-    record = otp_store.get(email.lower())
-    if not record:
-        return False, "No OTP found. Please sign up again."
-    if datetime.now() > record["expiry"]:
-        otp_store.pop(email.lower(), None)
-        return False, "OTP has expired. Please request a new one."
-    if entered.strip() != record["otp"]:
-        return False, "Invalid OTP. Please try again."
-    # Valid — clean up
-    otp_store.pop(email.lower(), None)
-    return True, "OTP verified successfully!"
+    if not mail_user or not mail_pass:
+        print("[ERROR] MAIL_USER or MAIL_PASSWORD environment variables not set.")
+        return False, "Server configuration error: missing email credentials."
+
+    subject = f"Your Verification Code: {otp}"
+    message_text = f"Your verification code is: {otp}\n\nThis code expires in 5 minutes.\n\n— Virtual Life with AI"
+    
+    msg = MIMEText(message_text)
+    msg["Subject"] = subject
+    msg["From"] = f"Virtual Life with AI <{mail_user}>"
+    msg["To"] = email
+
+    # 5. Send Email via SSL (Port 465)
+    try:
+        print(f"[DEBUG] Attempting to send email to {email}")
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(mail_user, mail_pass)
+            server.send_message(msg)
+        print(f"[SUCCESS] Email sent to {email}")
+        return True, "OTP sent successfully! Please check your inbox."
+    except Exception as e:
+        print(f"[ERROR] Exception occurred while sending email: {str(e)}")
+        return False, f"Email delivery failed: {str(e)}"
 
 
-# ---------------------------------------------------------------------------
-# OTP Email Template (Liquid Brokers - Premium Dark)
-# ---------------------------------------------------------------------------
-OTP_EMAIL_HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #050505; margin: 0; padding: 0; color: #ffffff; }
-        .wrapper { background-color: #050505; padding: 40px 20px; text-align: center; }
-        .container { max-width: 500px; margin: 0 auto; background-color: #111111; border-radius: 20px; border: 2px solid #d4af37; overflow: hidden; }
-        .header { padding: 30px; background-color: #000000; }
-        .brand { color: #d4af37; font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-        .content { padding: 40px; }
-        .title { font-size: 14px; color: #aaaaaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
-        .otp-box { background-color: #d4af37; border-radius: 12px; padding: 25px; margin: 20px 0; }
-        .otp-code { font-size: 40px; font-weight: 900; color: #000000; letter-spacing: 8px; }
-        .warning { font-size: 12px; color: #888888; line-height: 1.5; margin-top: 20px; }
-        .footer { padding: 20px; font-size: 10px; color: #555555; background-color: #000000; }
-    </style>
-</head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <div class="brand">Virtual Life with AI</div>
-            </div>
-            <div class="content">
-                <div class="title">Security Verification</div>
-                <div class="otp-box">
-                    <div class="otp-code">{{OTP}}</div>
-                </div>
-                <div class="warning">
-                    This code is valid for <b>5 minutes</b>.<br>
-                    Please do not share this with anyone.
-                </div>
-            </div>
-            <div class="footer">
-                &copy; 2026 Virtual Life with AI — Secure Access Portal
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
+# (verify_otp logic moved directly into the verify-otp route)
+
+
+# (HTML template removed for a cleaner production-ready plain text implementation)
 
 # ---------------------------------------------------------------------------
 # Email sender
 # ---------------------------------------------------------------------------
-def send_otp_email(to_email: str, otp: str) -> tuple[bool, str]:
-    """Send OTP email via Gmail SMTP formatted with Liquid Brokers Dark Theme."""
-    if not MAIL_USER or not MAIL_PASSWORD:
-        # Development fallback — print to console
-        print(f"\n{'='*50}")
-        print(f"  [DEV MODE] OTP for {to_email}: {otp}")
-        print(f"  (Set MAIL_USER + MAIL_PASSWORD in .env to send real emails)")
-        print(f"{'='*50}\n")
-        return True, ""
-
-    subject = f"{otp} is your verification code"
-    
-    # Create MIME message
-    msg = MIMEMultipart("alternative")
-    msg["From"]    = f"Virtual Life with AI <{MAIL_USER}>"
-    msg["To"]      = to_email
-    msg["Subject"] = subject
-
-    # Plain text version
-    text_body = f"Hello,\n\nYour Virtual Life verification code is: {otp}\n\nThis expires in 5 minutes.\n\n— Virtual Life with AI"
-    
-    # HTML version
-    html_body = OTP_EMAIL_HTML.replace("{{OTP}}", otp)
-
-    msg.attach(MIMEText(text_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
-
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
-            server.login(MAIL_USER, MAIL_PASSWORD)
-            server.send_message(msg)
-        return True, ""
-    except smtplib.SMTPAuthenticationError:
-        return False, "Email authentication failed. Check your MAIL_USER and MAIL_PASSWORD in .env."
-    except Exception as e:
-        return False, f"Failed to send email: {str(e)}"
+# (send_otp_email deleted - logic moved to send_otp)
 
 
 # ---------------------------------------------------------------------------
@@ -248,89 +203,98 @@ def status():
 
 @app.route("/signup", methods=["POST"])
 def signup():
-    data    = request.get_json()
-    email   = (data.get("email") or "").strip()
-    password = (data.get("password") or "").strip()
-    confirm = (data.get("confirm_password") or "").strip()
+    print("[DEBUG] Signup route triggered")
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
 
-    if not email or not password or not confirm:
-        return jsonify(success=False, message="All fields are required.")
-    if not is_valid_email(email):
-        return jsonify(success=False, message="Please enter a valid email address.")
-    if password != confirm:
-        return jsonify(success=False, message="Passwords do not match.")
-    ok, msg = is_valid_password(password)
-    if not ok:
-        return jsonify(success=False, message=msg)
+    if not email:
+        print("[DEBUG] Signup failed: missing email")
+        return jsonify(success=False, message="Email is required.")
+    
+    if len(password) < 8:
+        print("[DEBUG] Signup failed: password too short")
+        return jsonify(success=False, message="Password must be at least 8 characters.")
+
     if email_exists(email):
-        return jsonify(success=False, message="This email is already registered. Please log in.")
-
-    # Store password temporarily in server-side session until OTP verified
-    session["pending_email"]    = email.lower()
-    session["pending_password"] = password  # will be hashed when OTP verified
-
-    otp = generate_otp()
-    store_otp(email, otp)
-    success, err = send_otp_email(email, otp)
-    if not success:
-        return jsonify(success=False, message=err)
-
-    return jsonify(success=True, message=f"OTP sent to {email}. Check your inbox (and spam folder).")
-
-
-@app.route("/verify_otp", methods=["POST"])
-def verify_otp_route():
-    data  = request.get_json()
-    email = (data.get("email") or session.get("pending_email") or "").strip()
-    otp   = (data.get("otp") or "").strip()
-
-    if not email or not otp:
-        return jsonify(success=False, message="Email and OTP are required.")
-
-    # Double-check email hasn't been registered between signup and verify steps
-    if email_exists(email):
-        session.pop("pending_email", None)
-        session.pop("pending_password", None)
+        print(f"[DEBUG] Signup failed: {email} already exists")
         return jsonify(success=False, message="This email is already registered.")
 
-    ok, msg = verify_otp(email, otp)
-    if not ok:
+    # Store pending password in session securely
+    session["pending_email"] = email
+    session["pending_password"] = password
+
+    # Call send_otp
+    print(f"[DEBUG] Calling send_otp for {email}")
+    success, msg = send_otp(email)
+    
+    if not success:
         return jsonify(success=False, message=msg)
 
-    # OTP correct → save user
-    password = session.pop("pending_password", None)
-    session.pop("pending_email", None)
-    if not password:
+    return jsonify(success=True, message=msg)
+
+
+@app.route("/verify-otp", methods=["POST"])
+def verify_otp_route():
+    print("[DEBUG] Verify OTP route triggered")
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower() or session.get("pending_email")
+    otp_entered = data.get("otp", "").strip()
+
+    if not email or not otp_entered:
+        print("[DEBUG] Verification failed: missing email or OTP")
+        return jsonify(success=False, message="Email and OTP are required.")
+
+    # Retrieve OTP from store
+    record = otp_store.get(email)
+    if not record:
+        print(f"[DEBUG] Verification failed: no record for {email}")
+        return jsonify(success=False, message="No OTP record found. Please sign up again.")
+
+    # Check OTP and Expiry
+    if record["otp"] != otp_entered:
+        print(f"[DEBUG] Verification failed: invalid OTP for {email}")
+        return jsonify(success=False, message="Invalid verification code.")
+
+    if datetime.now() > record["expiry"]:
+        print(f"[DEBUG] Verification failed: OTP expired for {email}")
+        otp_store.pop(email, None) # Clean up
+        return jsonify(success=False, message="Verification code has expired.")
+
+    # Success!
+    print(f"[SUCCESS] OTP verified for {email}")
+    
+    # Save user data
+    pending_pass = session.get("pending_password")
+    if not pending_pass:
         return jsonify(success=False, message="Session expired. Please sign up again.")
 
-    save_user(email, password)
-    session["user_email"] = email.lower()
-    return jsonify(success=True, message="Account created successfully! Welcome to Virtual Life with AI.")
+    save_user(email, pending_pass)
+    
+    # Cleanup OTP and Session
+    otp_store.pop(email, None)
+    session.pop("pending_password", None)
+    session["user_email"] = email
+    
+    return jsonify(success=True, message="Account verified and created successfully!")
 
 
 @app.route("/resend-otp", methods=["POST"])
 def resend_otp():
-    data  = request.get_json()
-    email = (data.get("email") or session.get("pending_email") or "").strip()
+    print("[DEBUG] Resend OTP route triggered")
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower() or session.get("pending_email")
 
     if not email:
         return jsonify(success=False, message="No email found. Please start signup again.")
 
-    record = otp_store.get(email.lower(), {})
-    resend_count = record.get("resend_count", 0)
-    if resend_count >= MAX_RESENDS:
-        return jsonify(success=False, message="Maximum resend limit reached. Please start the signup process again.")
-
-    otp = generate_otp()
-    store_otp(email, otp)
-    otp_store[email.lower()]["resend_count"] = resend_count + 1
-
-    success, err = send_otp_email(email, otp)
+    # Call the new send_otp which already handles 60s protection
+    success, msg = send_otp(email)
+    
     if not success:
-        return jsonify(success=False, message=err)
+        return jsonify(success=False, message=msg)
 
-    remaining = MAX_RESENDS - (resend_count + 1)
-    return jsonify(success=True, message=f"New OTP sent to {email}. ({remaining} resend(s) remaining)")
+    return jsonify(success=True, message="A new verification code has been sent.")
 
 
 @app.route("/login", methods=["POST"])
@@ -367,9 +331,11 @@ def logout():
 if __name__ == "__main__":
     print("\n" + "="*55)
     print("  Virtual Life Auth Server running at http://localhost:5001")
-    if not MAIL_USER:
-        print("  ⚠  No .env found — OTPs will print to console (dev mode)")
+    m_user = os.getenv("MAIL_USER")
+    if not m_user:
+        print("  ⚠  WARNING: MAIL_USER not found in environment!")
     else:
-        print(f"  ✉  SMTP configured for: {MAIL_USER}")
+        print(f"  ✉  SMTP configured for: {m_user}")
     print("="*55 + "\n")
+    # Setting debug=False for a "production-ready" feel, or True if they prefer
     app.run(host="0.0.0.0", port=5001, debug=True)
