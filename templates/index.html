@@ -84,40 +84,21 @@
     }
     .nav-links a:hover::after { width: 100%; }
 
-    /* Auth nav buttons */
-    .nav-auth { display: flex; align-items: center; gap: 12px; }
+    /* Nav action button */
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
     .nav-btn {
       font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
       padding: 9px 20px; border-radius: 100px; cursor: pointer;
       font-family: 'Syncopate', sans-serif; transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
       text-decoration: none; display: inline-flex; align-items: center; gap: 7px;
     }
-    .nav-btn-login {
-      background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #fff;
-    }
-    .nav-btn-login:hover { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); }
-    .nav-btn-signup {
+    .nav-btn-primary {
       background: linear-gradient(135deg, #5e17eb, #a855f7);
       border: none; color: #fff;
       box-shadow: 0 4px 20px rgba(94,23,235,0.4);
     }
-    .nav-btn-signup:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(94,23,235,0.6); }
-    .nav-btn-signup::after { display: none !important; }
-
-    /* Logged-in badge */
-    .auth-badge {
-      display: none; align-items: center; gap: 10px;
-      background: rgba(94,23,235,0.15); border: 1px solid rgba(94,23,235,0.35);
-      border-radius: 100px; padding: 6px 14px 6px 8px;
-    }
-    .auth-badge.visible { display: flex; }
-    .auth-dot { width: 8px; height: 8px; background: #00e5a0; border-radius: 50%; box-shadow: 0 0 8px #00e5a0; }
-    .auth-email { font-size: 0.68rem; color: rgba(255,255,255,0.7); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .auth-logout {
-      background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer;
-      font-size: 0.7rem; padding: 0; transition: color 0.3s; margin-left: 4px;
-    }
-    .auth-logout:hover { color: #ff4d6d; }
+    .nav-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(94,23,235,0.6); }
+    .nav-btn-primary::after { display: none !important; }
     
     .menu-btn { display: none; color: #fff; font-size: 1.2rem; cursor: pointer; }
 
@@ -289,58 +270,11 @@
       <li><a href="#engineering">Engineering</a></li>
       <li><a href="#contact" style="color: var(--accent); font-weight: 600;">Contact Us</a></li>
     </ul>
-    <div class="nav-auth">
-      <!-- Shown when NOT logged in -->
-      <div id="nav-guest" style="display:flex;gap:10px;align-items:center;">
-        <a href="/auth" class="nav-btn nav-btn-login" id="btn-login">
-          <i class="fa-solid fa-right-to-bracket"></i> Login
-        </a>
-        <a href="/auth" class="nav-btn nav-btn-signup" id="btn-signup" onclick="goSignup(event)">
-          <i class="fa-solid fa-user-plus"></i> Sign Up
-        </a>
-      </div>
-      <!-- Shown when logged in -->
-      <div class="auth-badge" id="auth-badge">
-        <span class="auth-dot"></span>
-        <span class="auth-email" id="auth-email-text"></span>
-        <button class="auth-logout" id="btn-logout" title="Logout" onclick="doLogout()">
-          <i class="fa-solid fa-arrow-right-from-bracket"></i>
-        </button>
-      </div>
+    <div class="nav-cta">
+      <a href="#experience" class="nav-btn nav-btn-primary">Open Live Feed</a>
     </div>
     <div class="menu-btn"><i class="fa-solid fa-bars"></i></div>
   </nav>
-
-  <script>
-    // Check auth status from the auth server
-    async function checkAuthStatus() {
-      try {
-        const res  = await fetch('/status');
-        const data = await res.json();
-        if (data.logged_in) {
-          document.getElementById('nav-guest').style.display    = 'none';
-          document.getElementById('auth-badge').classList.add('visible');
-          document.getElementById('auth-email-text').textContent = data.email;
-        }
-      } catch(e) { /* auth server not running — show guest buttons */ }
-    }
-    checkAuthStatus();
-
-    function goSignup(e) {
-      e.preventDefault();
-      // Open auth page and default to signup tab
-      const win = window.open('/auth', '_self');
-    }
-
-    async function doLogout() {
-      try {
-        await fetch('/logout', { method: 'POST' });
-        window.location.reload();
-      } catch(e) {}
-      document.getElementById('nav-guest').style.display = 'flex';
-      document.getElementById('auth-badge').classList.remove('visible');
-    }
-  </script>
 
   <!-- HERO -->
   <section class="hero" id="home">
@@ -578,7 +512,7 @@
     <div class="footer-socials">
       <a href="https://github.com/Srishylam-code" target="_blank" title="GitHub"><i class="fa-brands fa-github"></i></a>
       <a href="https://www.linkedin.com/in/srishylam-bandi" target="_blank" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
-      <a href="mailto:bandisrishylam77@gmail.com" title="Email"><i class="fa-solid fa-envelope"></i></a>
+      <a href="mailto:earthear56@gmail.com" title="Email"><i class="fa-solid fa-envelope"></i></a>
     </div>
 
     <div class="footer-divider"></div>
@@ -624,7 +558,7 @@
       <div class="footer-copy">&copy; Copyright srishylam 2026. HandTrack Intelligence.</div>
       <div class="footer-bottom-links">
         <a href="#">SITEMAP</a>
-        <a href="mailto:bandisrishylam77@gmail.com" style="color:var(--accent); font-weight:700;">CONTACT US</a>
+        <a href="mailto:earthear56@gmail.com" style="color:var(--accent); font-weight:700;">CONTACT US</a>
         <a href="#">TERMS AND CONDITIONS</a>
         <a href="#">PRIVACY POLICY</a>
       </div>

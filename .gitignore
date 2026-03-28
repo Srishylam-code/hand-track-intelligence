@@ -1,6 +1,5 @@
 # Security & Environment
 .env
-users.xlsx
 
 # Python Caches and Virtual Environments
 __pycache__/
