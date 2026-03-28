@@ -42,7 +42,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production-secret-ke
 MAIL_USER     = os.environ.get("MAIL_USER", "")
 MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
 SMTP_HOST     = "smtp.gmail.com"
-SMTP_PORT     = 587
+SMTP_PORT     = 465
 
 USERS_FILE    = Path(__file__).parent / "users.xlsx"
 OTP_EXPIRY_MINUTES = 5
@@ -205,9 +205,7 @@ def send_otp_email(to_email: str, otp: str) -> tuple[bool, str]:
 
     try:
         context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls(context=context)
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
             server.login(MAIL_USER, MAIL_PASSWORD)
             server.send_message(msg)
         return True, ""
