@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hand Tracking Vision | srishylam</title>
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Manrope:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  
+  <!-- GSAP & Lenis for Luxury Smooth Animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/@studio-freight/lenis@1.0.34/dist/lenis.min.js"></script>
+  <!-- Three.js for 3D Art -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #020202;
+      --text-main: #fcfcfc;
+      --text-muted: #888888;
+      --accent: #5e17eb; /* Deep vibrant purple */
+      --accent-glow: rgba(94, 23, 235, 0.4);
+      --glass-bg: rgba(20, 20, 20, 0.3);
+      --glass-border: rgba(255, 255, 255, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    html.lenis { height: auto; }
+    .lenis.lenis-smooth { scroll-behavior: auto !important; }
+    .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+    .lenis.lenis-stopped { overflow: hidden; }
+    .lenis.lenis-scrolling iframe { pointer-events: none; }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* WebGL Canvas */
+    #webgl-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* Typography */
+    h1, h2, h3, .nav-logo {
+      font-family: 'Syncopate', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Fixed Navigation - Premium style */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 30px 6%; z-index: 100;
+      background: transparent;
+      mix-blend-mode: difference;
+      transition: padding 0.5s ease;
+    }
+    nav.scrolled { padding: 15px 6%; }
+    .nav-logo { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 40px; list-style: none; align-items: center; }
+    .nav-links a {
+      color: #fff; text-decoration: none; font-size: 0.75rem; letter-spacing: 0.15em;
+      text-transform: uppercase; transition: color 0.4s; position: relative;
+    }
+    .nav-links a::after {
+      content: ''; position: absolute; bottom: -6px; left: 0; width: 0%; height: 1px;
+      background: #fff; transition: width 0.4s ease;
+    }
+    .nav-links a:hover::after { width: 100%; }
+
+    /* Auth nav buttons */
+    .nav-auth { display: flex; align-items: center; gap: 12px; }
+    .nav-btn {
+      font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 9px 20px; border-radius: 100px; cursor: pointer;
+      font-family: 'Syncopate', sans-serif; transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+      text-decoration: none; display: inline-flex; align-items: center; gap: 7px;
+    }
+    .nav-btn-login {
+      background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #fff;
+    }
+    .nav-btn-login:hover { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); }
+    .nav-btn-signup {
+      background: linear-gradient(135deg, #5e17eb, #a855f7);
+      border: none; color: #fff;
+      box-shadow: 0 4px 20px rgba(94,23,235,0.4);
+    }
+    .nav-btn-signup:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(94,23,235,0.6); }
+    .nav-btn-signup::after { display: none !important; }
+
+    /* Logged-in badge */
+    .auth-badge {
+      display: none; align-items: center; gap: 10px;
+      background: rgba(94,23,235,0.15); border: 1px solid rgba(94,23,235,0.35);
+      border-radius: 100px; padding: 6px 14px 6px 8px;
+    }
+    .auth-badge.visible { display: flex; }
+    .auth-dot { width: 8px; height: 8px; background: #00e5a0; border-radius: 50%; box-shadow: 0 0 8px #00e5a0; }
+    .auth-email { font-size: 0.68rem; color: rgba(255,255,255,0.7); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .auth-logout {
+      background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer;
+      font-size: 0.7rem; padding: 0; transition: color 0.3s; margin-left: 4px;
+    }
+    .auth-logout:hover { color: #ff4d6d; }
+    
+    .menu-btn { display: none; color: #fff; font-size: 1.2rem; cursor: pointer; }
+
+    /* Grand Sections */
+    section {
+      position: relative; z-index: 10;
+      min-height: 100vh;
+      padding: 120px 6%;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+
+    /* HERO */
+    .hero { text-align: center; justify-content: center; }
+    .hero-pre {
+      font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: 2vh; display: block;
+    }
+    .hero-title {
+      font-size: clamp(3rem, 7vw, 7rem); font-weight: 700; line-height: 1.1; margin-bottom: 30px;
+      background: linear-gradient(180deg, #fff 0%, #aaa 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-desc {
+      font-size: clamp(1rem, 1.5vw, 1.2rem); color: var(--text-muted); max-width: 600px;
+      margin: 0 auto 50px; font-weight: 300;
+    }
+    .btn {
+      display: inline-block; padding: 18px 40px;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 100px;
+      background: rgba(255,255,255,0.02); color: #fff; text-decoration: none;
+      font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;
+      backdrop-filter: blur(10px); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer; overflow: hidden; position: relative;
+    }
+    .btn::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: #fff; transform: scaleX(0); transform-origin: right; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); z-index: -1;
+    }
+    .btn:hover { color: #000; border-color: #fff; }
+    .btn:hover::before { transform: scaleX(1); transform-origin: left; }
+    .btn-accent { border-color: var(--accent); color: var(--accent); }
+    .btn-accent:hover { color: #fff; }
+    .btn-accent::before { background: var(--accent); }
+
+    /* THE STREAM (Video Demo) */
+    .video-section { padding: 80px 6%; align-items: center; }
+    .video-wrapper {
+      width: 100%; max-width: 1200px; border-radius: 20px;
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      padding: 10px; box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+      position: relative; overflow: hidden;
+    }
+    .video-wrapper::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% -20%, var(--accent-glow) 0%, transparent 60%);
+      pointer-events: none; z-index: 0;
+    }
+    .video-container {
+      width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px;
+      overflow: hidden; position: relative; z-index: 1;
+    }
+    .video-container img {
+      width: 100%; height: 100%; object-fit: cover; opacity: 0.9;
+    }
+    .live-badge {
+      position: absolute; top: 20px; right: 20px;
+      background: rgba(255,0,0,0.2); border: 1px solid rgba(255,0,0,0.4);
+      color: #ff3333; padding: 6px 12px; border-radius: 50px;
+      font-size: 0.7rem; letter-spacing: 0.1em; font-weight: 700; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px; z-index: 10;
+    }
+    .live-dot { width: 6px; height: 6px; background: #ff3333; border-radius: 50%; animation: blink 1s infinite alternate; }
+    @keyframes blink { 0% { opacity: 0.3; box-shadow: none; } 100% { opacity: 1; box-shadow: 0 0 10px #ff3333; } }
+
+    /* Splitted Content Sections */
+    .split-section { display: grid; grid-template-columns: 1fr 1fr; gap: 8%; align-items: center; }
+    .split-text h2 { font-size: clamp(2rem, 4vw, 3.5rem); margin-bottom: 30px; line-height: 1.2; }
+    .split-text p { color: var(--text-muted); font-size: 1.1rem; margin-bottom: 20px; font-weight: 300; }
+    
+    /* Stats Grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-top: 50px; }
+    .stat-box { border-top: 1px solid var(--glass-border); padding-top: 20px; }
+    .stat-num { font-family: 'Syncopate', sans-serif; font-size: 2.5rem; font-weight: 700; color: #fff; margin-bottom: 5px; }
+    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+
+    /* Features Grid Luxury */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; margin-top: 80px;
+    }
+    .feature-card {
+      padding: 50px 40px; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: 16px; backdrop-filter: blur(10px); transition: all 0.5s ease;
+      position: relative; overflow: hidden;
+    }
+    .feature-card::after {
+      content: ''; position: absolute; bottom: 0; left: 0; width: 0%; height: 2px;
+      background: var(--accent); transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .feature-card:hover { transform: translateY(-10px); background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1); }
+    .feature-card:hover::after { width: 100%; }
+    .feature-card i { font-size: 2rem; color: #fff; margin-bottom: 30px; display: block; }
+    .feature-card h3 { font-size: 1.1rem; margin-bottom: 15px; }
+    .feature-card p { font-size: 0.9rem; color: var(--text-muted); }
+
+    /* Tech Stack Line */
+    .tech-marquee {
+      position: relative; width: 100vw; max-width: 100%; overflow: hidden;
+      padding: 60px 0; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border);
+      background: rgba(0,0,0,0.5);
+    }
+    .marquee-content {
+      display: flex; gap: 80px; width: max-content;
+      animation: marquee 20s linear infinite;
+    }
+    .tech-item {
+      display: flex; align-items: center; gap: 15px;
+      font-size: 1.5rem; color: var(--text-muted); font-family: 'Syncopate', sans-serif;
+      text-decoration: none; transition: color 0.3s, transform 0.3s; cursor: pointer;
+    }
+    .tech-item:hover { color: var(--accent); transform: scale(1.05); }
+    @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(calc(-50% - 40px)); } }
+
+    /* Luxury Footer */
+    footer {
+      background: var(--bg-dark); padding: 80px 6% 30px; position: relative; z-index: 10;
+      border-top: 1px solid var(--glass-border); font-family: 'Manrope', sans-serif;
+    }
+    .footer-top { display: flex; justify-content: center; align-items: center; gap: 60px; margin-bottom: 40px; }
+    .footer-top a { color: var(--text-main); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; text-decoration: none; font-family: 'Syncopate', sans-serif; transition: color 0.3s; }
+    .footer-top a:hover { color: var(--accent); }
+    
+    .footer-socials { display: flex; justify-content: center; gap: 40px; margin-bottom: 40px; }
+    .footer-socials a { color: var(--text-main); font-size: 1.4rem; transition: color 0.3s; }
+    .footer-socials a:hover { color: var(--accent); }
+    
+    .footer-divider { width: 100%; height: 1px; background: var(--glass-border); margin: 0 0 50px 0; }
+    
+    .footer-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 40px; margin-bottom: 60px; }
+    .footer-col h4 { font-family: 'Manrope', sans-serif; font-size: 1.1rem; font-weight: 400; color: var(--text-main); margin-bottom: 25px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 15px; }
+    .footer-col ul a { color: var(--text-muted); text-decoration: none; font-size: 0.8rem; letter-spacing: 0.05em; transition: color 0.3s; }
+    .footer-col ul a:hover { color: var(--text-main); }
+    
+    .footer-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 30px; border-top: 1px solid var(--glass-border); flex-wrap: wrap; gap: 20px; }
+    .footer-bottom-links { display: flex; gap: 30px; flex-wrap: wrap; }
+    .footer-bottom-links a { color: var(--text-muted); text-decoration: none; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; transition: color 0.3s; font-family: 'Syncopate', sans-serif; }
+    .footer-bottom-links a:hover { color: var(--text-main); }
+    .footer-copy { color: var(--text-muted); font-size: 0.7rem; letter-spacing: 0.05em; }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .split-section { grid-template-columns: 1fr; gap: 50px; }
+      .nav-links { display: none; }
+      .menu-btn { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Underlay WebGL Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <nav id="navbar">
+    <a href="#" class="nav-logo">Hand<span>Track</span></a>
+    <ul class="nav-links">
+      <li><a href="#vision">Vision</a></li>
+      <li><a href="#experience">Experience</a></li>
+      <li><a href="#engineering">Engineering</a></li>
+      <li><a href="#contact" style="color: var(--accent); font-weight: 600;">Contact Us</a></li>
+    </ul>
+    <div class="nav-auth">
+      <!-- Shown when NOT logged in -->
+      <div id="nav-guest" style="display:flex;gap:10px;align-items:center;">
+        <a href="/auth" class="nav-btn nav-btn-login" id="btn-login">
+          <i class="fa-solid fa-right-to-bracket"></i> Login
+        </a>
+        <a href="/auth" class="nav-btn nav-btn-signup" id="btn-signup" onclick="goSignup(event)">
+          <i class="fa-solid fa-user-plus"></i> Sign Up
+        </a>
+      </div>
+      <!-- Shown when logged in -->
+      <div class="auth-badge" id="auth-badge">
+        <span class="auth-dot"></span>
+        <span class="auth-email" id="auth-email-text"></span>
+        <button class="auth-logout" id="btn-logout" title="Logout" onclick="doLogout()">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+    <div class="menu-btn"><i class="fa-solid fa-bars"></i></div>
+  </nav>
+
+  <script>
+    // Check auth status from the auth server
+    async function checkAuthStatus() {
+      try {
+        const res  = await fetch('/status');
+        const data = await res.json();
+        if (data.logged_in) {
+          document.getElementById('nav-guest').style.display    = 'none';
+          document.getElementById('auth-badge').classList.add('visible');
+          document.getElementById('auth-email-text').textContent = data.email;
+        }
+      } catch(e) { /* auth server not running — show guest buttons */ }
+    }
+    checkAuthStatus();
+
+    function goSignup(e) {
+      e.preventDefault();
+      // Open auth page and default to signup tab
+      const win = window.open('/auth', '_self');
+    }
+
+    async function doLogout() {
+      try {
+        await fetch('/logout', { method: 'POST' });
+        window.location.reload();
+      } catch(e) {}
+      document.getElementById('nav-guest').style.display = 'flex';
+      document.getElementById('auth-badge').classList.remove('visible');
+    }
+  </script>
+
+  <!-- HERO -->
+  <section class="hero" id="home">
+    <div class="gsap-reveal-hero">
+      <span class="hero-pre">The Future of Interaction</span>
+      <h1 class="hero-title">Gesture<br>Intelligence</h1>
+      <p class="hero-desc">Experience seamless, touchless computing powered by AI. Real-time sub-millimeter precision mapping directly to dynamic volumetric interfaces.</p>
+      <div style="display:flex; gap:20px; justify-content:center;">
+        <a href="#experience" class="btn btn-accent">Initiate Interface</a>
+        <a href="https://github.com/Srishylam-code" class="btn">View Source</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- THE EXPERIENCE / VIDEO -->
+  <section class="video-section gs-reveal" id="experience">
+    <span class="hero-pre" style="text-align: center;">Live Pipeline</span>
+    <h2 style="text-align: center; margin-bottom: 10px; font-size: clamp(1.5rem, 3vw, 2.5rem);">Seamless Biometric Translation</h2>
+    
+    <!-- Camera Connect UI -->
+    <div style="text-align: center; margin-bottom: 50px;">
+      <p style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px;">Primary Input Source</p>
+      <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; align-items: center;">
+        <button onclick="setCamera(0)" class="btn btn-accent" style="padding: 12px 30px; font-size: 0.8rem; border-radius:100px;">💻 Laptop Camera</button>
+      </div>
+    </div>
+
+    <div class="video-wrapper">
+      <div class="live-badge" id="live-badge" style="display: none;"><div class="live-dot"></div> Live Socket</div>
+      <div class="video-container" id="video-container">
+        <!-- Standby UI -->
+        <div id="video-standby" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); z-index: 5;">
+          <i class="fa-solid fa-video-slash" style="font-size: 4rem; color: var(--text-muted); margin-bottom: 20px;"></i>
+          <p style="color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.2em;">Pipeline Standby</p>
+          <button onclick="startPipeline()" class="btn btn-accent" style="margin-top: 30px; padding: 15px 35px;">
+            <i class="fa-solid fa-play"></i> Run Pipeline
+          </button>
+        </div>
+        <!-- Live OpenCV Feed -->
+        <img id="video-feed-img" src="" alt="Neural Hand Tracking Live Stream" style="display: none;" />
+      </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div style="margin-top: 30px; display: flex; gap: 20px; justify-content: center;">
+        <button id="btn-stop-pipeline" onclick="stopPipeline()" class="btn" style="display: none; border-color: #ff4d6d; color: #ff4d6d;">
+            <i class="fa-solid fa-stop"></i> Stop / Cancel
+        </button>
+    </div>
+
+    <script>
+      async function startPipeline() {
+        try {
+          console.log("[UI] Requesting backend to start pipeline...");
+          
+          // Force back to Laptop Camera (0) before starting
+          await fetch('/set_camera', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: 0 })
+          });
+
+          const res = await fetch('/set_camera', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: 'start' })
+          });
+          
+          if (res.ok) {
+            document.getElementById('video-standby').style.display = 'none';
+            const img = document.getElementById('video-feed-img');
+            img.src = '/video_feed?t=' + Date.now();
+            img.style.display = 'block';
+            document.getElementById('live-badge').style.display = 'flex';
+            document.getElementById('btn-stop-pipeline').style.display = 'inline-block';
+          }
+        } catch (err) {
+          console.error("[UI] Error starting pipeline:", err);
+        }
+      }
+
+      // Cleanup: remove browser detection listeners
+      navigator.mediaDevices.ondevicechange = null;
+
+      async function stopPipeline() {
+        try {
+          const res = await fetch('/set_camera', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: 'stop' })
+          });
+
+          if (res.ok) {
+            document.getElementById('video-standby').style.display = 'flex';
+            document.getElementById('video-feed-img').style.display = 'none';
+            document.getElementById('video-feed-img').src = '';
+            document.getElementById('live-badge').style.display = 'none';
+            document.getElementById('btn-stop-pipeline').style.display = 'none';
+          }
+        } catch (err) {
+          console.error("[UI] Error stopping pipeline:", err);
+        }
+      }
+
+      function syncSelectedCamera() {
+          // No-op - feature removed
+      }
+
+      function setCamera(source) {
+        console.log(`[UI] Setting camera to index/source: ${source}`);
+        fetch('/set_camera', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: source })
+        })
+        .then(r => r.json())
+        .then(data => {
+            console.log('Camera source updated:', data);
+            
+            // Immediately trigger a 'start' command to refresh the backend loop with new source
+            return fetch('/set_camera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source: 'start' })
+            });
+        })
+        .then(() => {
+            const img = document.getElementById('video-feed-img');
+            if (img.style.display === 'block') {
+               img.src = '/video_feed?t=' + Date.now();
+            } else {
+               // If not running yet, just alert
+               alert(`Switched to Camera Device ${source}. Click RUN PIPELINE below!`);
+            }
+        })
+        .catch(e => console.error(e));
+      }
+      
+      function connectIPCamera() {
+        const url = prompt("Enter IP Camera URL (e.g., http://192.168.1.15:8080/video)", "http://192.168.1.15:8080/video");
+        if (url && url.trim() !== "") {
+          setCamera(url.trim());
+        }
+      }
+    </script>
+
+  </section>
+
+  <!-- VISION / ABOUT -->
+  <section class="split-section gs-reveal" id="vision">
+    <div class="split-text">
+      <span class="hero-pre">The Philosophy</span>
+      <h2>Beyond<br>Screens.</h2>
+      <p>By bypassing traditional input mechanisms, we create a zero-friction conduit between human intent and machine execution.</p>
+      <p>Using Google's MediaPipe framework, 21 multi-dimensional landmark coordinates are continuously captured per hand, translating physical nuance into majestic algorithmic art via TouchDesigner.</p>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-num">21</div>
+          <div class="stat-label">Landmarks Tracked</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num">60+</div>
+          <div class="stat-label">Frames Per Sec</div>
+        </div>
+      </div>
+    </div>
+    <div style="position: relative; height: 500px; background: radial-gradient(circle, var(--glass-bg), transparent); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--glass-border);">
+      <i class="fa-solid fa-hand-sparkles" style="font-size: 8rem; color: #fff; text-shadow: 0 0 40px var(--accent);"></i>
+    </div>
+  </section>
+
+  <!-- ENGINEERING / CAPABILITIES -->
+  <section class="gs-reveal" id="engineering">
+    <span class="hero-pre">Architecture</span>
+    <h2>Proprietary Technologies</h2>
+    <p style="color: var(--text-muted); max-width: 800px; margin-bottom: 20px; font-size: 1.1rem; font-weight: 300;">
+      Our system bridges the physical-digital divide by integrating state-of-the-art computer vision models with physics-based rendering engines, delivering an uncompromising volumetric experience.
+    </p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <i class="fa-solid fa-microchip"></i>
+        <h3>Neural Pipeline Inference</h3>
+        <p style="margin-bottom: 20px;">Utilizing Google's MediaPipe, our high-performance machine learning node computes 21 spatial constraints per hand at true 60+ FPS, adapting dynamically to diverse lighting and occlusion scenarios.</p>
+        <a href="https://www.geeksforgeeks.org/machine-learning/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
+          Explore ML on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
+        </a>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-ruler-combined"></i>
+        <h3>Dynamic Topology Engine</h3>
+        <p style="margin-bottom: 20px;">By evaluating the continuous Euclidean distance between critical joint landmarks (e.g. thumb to index tip), the engine fluidly maps microscopic finger flexes directly to UI elements in 3D space.</p>
+        <a href="https://www.geeksforgeeks.org/mathematics-and-statistics/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
+          Explore Math on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
+        </a>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-bolt"></i>
+        <h3>Zero-Latency OSC Telemetry</h3>
+        <p style="margin-bottom: 20px;">To ensure the visualizer reacts concurrently to physical movement, massive multidimensional coordinate matrices are multiplexed via UDP into TouchDesigner over the Open Sound Control protocol.</p>
+        <a href="https://www.geeksforgeeks.org/computer-network-tutorials/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
+          Explore UDP on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- INFINITE TECH SCROLL -->
+  <div class="tech-marquee gs-reveal">
+    <div class="marquee-content">
+      <!-- Duplicated for infinite effect -->
+      <a href="https://www.geeksforgeeks.org/python-programming-language/" target="_blank" class="tech-item" title="Learn Python on GeeksforGeeks"><i class="fa-brands fa-python"></i> PYTHON</a>
+      <a href="https://developers.google.com/mediapipe" target="_blank" class="tech-item" title="Learn MediaPipe"><i class="fa-solid fa-brain"></i> MEDIAPIPE</a>
+      <a href="https://www.geeksforgeeks.org/opencv-python-tutorial/" target="_blank" class="tech-item" title="Learn OpenCV on GeeksforGeeks"><i class="fa-solid fa-camera"></i> OPENCV</a>
+      <a href="https://derivative.ca/" target="_blank" class="tech-item" title="Explore TouchDesigner"><i class="fa-solid fa-wave-square"></i> TOUCHDESIGNER</a>
+      <a href="https://www.geeksforgeeks.org/flask-tutorial/" target="_blank" class="tech-item" title="Learn Flask on GeeksforGeeks"><i class="fa-solid fa-code"></i> FLASK</a>
+      <a href="https://www.geeksforgeeks.org/python-programming-language/" target="_blank" class="tech-item" title="Learn Python on GeeksforGeeks"><i class="fa-brands fa-python"></i> PYTHON</a>
+      <a href="https://developers.google.com/mediapipe" target="_blank" class="tech-item" title="Learn MediaPipe"><i class="fa-solid fa-brain"></i> MEDIAPIPE</a>
+      <a href="https://www.geeksforgeeks.org/opencv-python-tutorial/" target="_blank" class="tech-item" title="Learn OpenCV on GeeksforGeeks"><i class="fa-solid fa-camera"></i> OPENCV</a>
+      <a href="https://derivative.ca/" target="_blank" class="tech-item" title="Explore TouchDesigner"><i class="fa-solid fa-wave-square"></i> TOUCHDESIGNER</a>
+      <a href="https://www.geeksforgeeks.org/flask-tutorial/" target="_blank" class="tech-item" title="Learn Flask on GeeksforGeeks"><i class="fa-solid fa-code"></i> FLASK</a>
+    </div>
+  </div>
+
+  <footer id="contact" class="gs-reveal">
+    <div class="footer-top">
+      <a href="#vision">Philosophy</a>
+      <a href="#experience" style="display:flex; flex-direction:column; align-items:center; gap:8px; font-weight:700; font-size:1rem; letter-spacing:0.2em;">
+        <i class="fa-solid fa-hand-sparkles" style="font-size:2rem; color:var(--accent);"></i>
+        HANDTRACK
+      </a>
+      <a href="#engineering">Architecture</a>
+    </div>
+
+    <div class="footer-socials">
+      <a href="https://github.com/Srishylam-code" target="_blank" title="GitHub"><i class="fa-brands fa-github"></i></a>
+      <a href="https://www.linkedin.com/in/srishylam-bandi" target="_blank" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+      <a href="mailto:bandisrishylam77@gmail.com" title="Email"><i class="fa-solid fa-envelope"></i></a>
+    </div>
+
+    <div class="footer-divider"></div>
+
+    <div class="footer-columns">
+      <div class="footer-col">
+        <h4>Capabilities</h4>
+        <ul>
+          <li><a href="#">Neural Tracking</a></li>
+          <li><a href="#">OSC Telemetry</a></li>
+          <li><a href="#">TouchDesigner Sync</a></li>
+          <li><a href="#">Sub-10ms Latency</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Experience</h4>
+        <ul>
+          <li><a href="#">Live Pipeline</a></li>
+          <li><a href="#">Volumetric Interfaces</a></li>
+          <li><a href="#">Biometric Translation</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Documentation <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i></a></li>
+          <li><a href="#">Source Code <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i></a></li>
+          <li><a href="#">Installation Guide</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Developer</h4>
+        <ul>
+          <li><a href="#">About srishylam</a></li>
+          <li><a href="#">Artificial Intelligence</a></li>
+          <li><a href="#">Machine Learning</a></li>
+          <li><a href="#">Creative Coding</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-copy">&copy; Copyright srishylam 2026. HandTrack Intelligence.</div>
+      <div class="footer-bottom-links">
+        <a href="#">SITEMAP</a>
+        <a href="mailto:bandisrishylam77@gmail.com" style="color:var(--accent); font-weight:700;">CONTACT US</a>
+        <a href="#">TERMS AND CONDITIONS</a>
+        <a href="#">PRIVACY POLICY</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // --- 1. LENIS SMOOTH SCROLL ---
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), 
+      smooth: true,
+      mouseMultiplier: 1.0
+    });
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    // --- 2. GSAP SCROLL ANIMATIONS ---
+    gsap.registerPlugin(ScrollTrigger);
+    
+    // Hero entrance
+    gsap.fromTo('.gsap-reveal-hero > *', 
+      { y: 60, opacity: 0 },
+      { y: 0, opacity: 1, duration: 1.5, stagger: 0.15, ease: 'power3.out', delay: 0.2 }
+    );
+
+    // Fade up sections on scroll
+    const revealElements = document.querySelectorAll('.gs-reveal');
+    revealElements.forEach((el) => {
+      gsap.fromTo(el, 
+        { y: 100, opacity: 0 },
+        { 
+          y: 0, opacity: 1, duration: 1.2, ease: 'power3.out',
+          scrollTrigger: {
+            trigger: el,
+            start: "top 85%",
+            toggleActions: "play none none reverse"
+          }
+        }
+      );
+    });
+
+    // Nav shrink
+    window.addEventListener('scroll', () => {
+      const nav = document.getElementById('navbar');
+      if(window.scrollY > 50) {
+        nav.classList.add('scrolled');
+        nav.style.background = 'rgba(2, 2, 2, 0.8)';
+        nav.style.backdropFilter = 'blur(10px)';
+        nav.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+      } else {
+        nav.classList.remove('scrolled');
+        nav.style.background = 'transparent';
+        nav.style.backdropFilter = 'none';
+        nav.style.borderBottom = 'none';
+      }
+    });
+
+    // --- 3. THREE.JS LUXURY 3D BACKGROUND ---
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020202, 0.001);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.z = 400;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Create intricate geometry (TorusKnot for premium tech feel) combined with particles
+    const mainGroup = new THREE.Group();
+    scene.add(mainGroup);
+
+    // 1. Central Abstract Wireframe
+    const geoWire = new THREE.TorusKnotGeometry(120, 30, 150, 20);
+    const matWire = new THREE.MeshBasicMaterial({ color: 0x5e17eb, wireframe: true, transparent: true, opacity: 0.15 });
+    const meshWire = new THREE.Mesh(geoWire, matWire);
+    mainGroup.add(meshWire);
+
+    // 2. Floating Star Dust Particles
+    const particlesGeometry = new THREE.BufferGeometry();
+    const particlesCount = 2000;
+    const posArray = new Float32Array(particlesCount * 3);
+    for(let i=0; i < particlesCount * 3; i++) {
+      // Spread them wide
+      posArray[i] = (Math.random() - 0.5) * 1500;
+    }
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    
+    // Create a circular glowing texture for particles programmatically
+    const getParticleTexture = () => {
+      const cvs = document.createElement('canvas');
+      cvs.width = 32; cvs.height = 32;
+      const ctx = cvs.getContext('2d');
+      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.2, 'rgba(150, 50, 255, 0.8)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(16,16,16,0,Math.PI*2);
+      ctx.fill();
+      const tex = new THREE.CanvasTexture(cvs);
+      return tex;
+    };
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 4,
+      map: getParticleTexture(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.6
+    });
+
+    const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particleMesh);
+
+    // Mouse Interaction
+    let mouseX = 0; let mouseY = 0;
+    let targetX = 0; let targetY = 0;
+    const windowHalfX = window.innerWidth / 2;
+    const windowHalfY = window.innerHeight / 2;
+
+    document.addEventListener('mousemove', (event) => {
+      mouseX = (event.clientX - windowHalfX) * 0.1;
+      mouseY = (event.clientY - windowHalfY) * 0.1;
+    });
+
+    // Animation Loop
+    const clock = new THREE.Clock();
+
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+      const elapsedTime = clock.getElapsedTime();
+
+      // Smooth camera follow mouse
+      targetX = mouseX * 0.5;
+      targetY = mouseY * 0.5;
+      
+      mainGroup.rotation.y += 0.002;
+      mainGroup.rotation.x += 0.001;
+      
+      particleMesh.rotation.y = -elapsedTime * 0.05;
+      particleMesh.rotation.x = elapsedTime * 0.02;
+
+      // Parallax effect based on scroll position!
+      const scrollY = window.scrollY;
+      mainGroup.position.y = -scrollY * 0.1;
+      
+      // Slight camera swing
+      camera.position.x += (mouseX - camera.position.x) * 0.02;
+      camera.position.y += (-mouseY - camera.position.y) * 0.02;
+      camera.lookAt(scene.position);
+
+      renderer.render(scene, camera);
+    }
+    animateThree();
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+  </script>
+</body>
+</html>

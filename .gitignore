@@ -1,0 +1,11 @@
+# Security & Environment
+.env
+users.xlsx
+
+# Python Caches and Virtual Environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
