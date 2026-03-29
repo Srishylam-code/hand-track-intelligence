@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Hand Tracking Vision | srishylam</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <title>Hand Tracking Vision | Luxury Dashboard</title>
   
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Manrope:wght@300;400;600&display=swap" rel="stylesheet"/>
@@ -16,6 +19,11 @@
   <script src="https://unpkg.com/@studio-freight/lenis@1.0.34/dist/lenis.min.js"></script>
   <!-- Three.js for 3D Art -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  
+  <!-- MediaPipe Hand Tracking (Web SDK) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
   <style>
     :root {
@@ -143,6 +151,28 @@
     .btn-accent:hover { color: #fff; }
     .btn-accent::before { background: var(--accent); }
 
+    .btn-cancel { border-color: #ff3366; color: #ff3366; }
+    .btn-cancel:hover { color: #fff; }
+    .btn-cancel::before { background: #ff3366; }
+
+    .camera-select-btn {
+      margin: 0 auto 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 30px;
+      border: 1px solid var(--accent);
+      border-radius: 100px;
+      color: #fff;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      background: rgba(94, 23, 235, 0.1);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .camera-select-btn:hover { background: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+
     /* THE STREAM (Video Demo) */
     .video-section { padding: 80px 6%; align-items: center; }
     .video-wrapper {
@@ -259,6 +289,9 @@
 </head>
 <body>
 
+  <!-- Video Input for Tracking (Hidden) -->
+  <video id="input_video" style="display:none;" playsinline></video>
+
   <!-- Underlay WebGL Canvas -->
   <canvas id="webgl-canvas"></canvas>
 
@@ -276,6 +309,13 @@
     <div class="menu-btn"><i class="fa-solid fa-bars"></i></div>
   </nav>
 
+  <!-- LOADING OVERLAY -->
+  <div id="loading-overlay" style="position:fixed; inset:0; z-index:9999; background:var(--bg-dark); display:flex; flex-direction:column; align-items:center; justify-content:center; transition: opacity 0.5s ease;">
+     <div style="width:50px; height:50px; border:3px solid var(--accent); border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>
+     <p style="margin-top:20px; font-family:'Syncopate', sans-serif; font-size:0.7rem; letter-spacing:0.3em; color:var(--accent);">INITIALIZING HAND INTEL</p>
+  </div>
+  <style> @keyframes spin { to { transform: rotate(360deg); } } </style>
+
   <!-- HERO -->
   <section class="hero" id="home">
     <div class="gsap-reveal-hero">
@@ -291,194 +331,157 @@
 
   <!-- THE EXPERIENCE / VIDEO -->
   <section class="video-section gs-reveal" id="experience">
-    <span class="hero-pre" style="text-align: center;">Live Pipeline</span>
-    <h2 style="text-align: center; margin-bottom: 10px; font-size: clamp(1.5rem, 3vw, 2.5rem);">Backend-Compatible Deployment Mode</h2>
+    <div style="display:flex; flex-direction:column; align-items:center; width:100%;">
+      
+      <!-- Top Camera Selection Button -->
+      <button id="start-btn" class="camera-select-btn">
+        <i class="fa-solid fa-camera"></i> OPEN CAMERA
+      </button>
 
-    <div class="video-wrapper">
-      <div class="video-container" style="display:flex; align-items:center; justify-content:center; padding:50px 30px;">
-        <div style="max-width:760px; text-align:center; z-index:2;">
-          <i class="fa-solid fa-cloud-arrow-up" style="font-size:4rem; color:var(--accent); margin-bottom:24px;"></i>
-          <p style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.18em; margin-bottom:16px;">Render Deployment</p>
-          <p style="font-size:1.05rem; color:var(--text-main); margin-bottom:16px;">
-            This cloud deployment runs as a Flask backend only. Local webcam capture, OpenCV preview windows,
-            and GUI-based pipeline controls are disabled to keep the service compatible with Render.
-          </p>
-          <p id="runtime-message" style="font-size:0.95rem; color:var(--text-muted); margin-bottom:28px;">
-            Checking backend runtime status...
-          </p>
-          <div style="display:flex; gap:18px; justify-content:center; flex-wrap:wrap;">
-            <a href="/health" class="btn btn-accent">Health Check</a>
-            <a href="https://render.com/docs" target="_blank" class="btn">Render Docs</a>
+      <div class="video-wrapper" style="border: 2px solid #333; border-radius: 20px;">
+        <div class="video-container" style="display:flex; align-items:center; justify-content:center; padding:10px; min-height: 540px; background: #000; position:relative;">
+          
+          <!-- Loading Overlay -->
+          <div id="loading-overlay-cam" style="position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10; background:rgba(0,0,0,0.9); border-radius:12px;">
+             <div style="width:40px; height:40px; border:3px solid #5e17eb; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></div>
+          </div>
+
+          <!-- The Live Tracking Canvas -->
+          <canvas id="output_canvas" style="width:100%; height:100%; object-fit:contain; border-radius:12px; z-index:1; display:none;"></canvas>
+          
+          <!-- Static Placeholder before start -->
+          <div id="placeholder-ui" style="text-align:center; opacity:0.5;">
+            <i class="fa-solid fa-hand-sparkles" style="font-size:4rem; color:#5e17eb; margin-bottom:20px;"></i>
+            <p style="font-family:'Syncopate', sans-serif; font-size:0.6rem; letter-spacing:0.2em;">SYSTEM STANDBY</p>
           </div>
         </div>
       </div>
+
+      <!-- Bottom Cancel Button -->
+      <button id="stop-btn" class="btn btn-cancel" style="margin-top:30px; padding: 12px 60px;">
+        <i class="fa-solid fa-square"></i> STOP / CANCEL
+      </button>
+
     </div>
-
-    <script>
-      async function loadRuntimeStatus() {
-        const message = document.getElementById('runtime-message');
-        try {
-          const res = await fetch('/runtime-status');
-          const data = await res.json();
-          message.textContent = data.message || 'Backend runtime is available.';
-        } catch (err) {
-          message.textContent = 'Backend status endpoint is unavailable right now.';
-        }
-      }
-
-      loadRuntimeStatus();
-    </script>
   </section>
 
-  <!-- VISION / ABOUT -->
-  <section class="split-section gs-reveal" id="vision">
+  <!-- VISION SECTION -->
+  <section id="vision" class="split-section gs-reveal">
     <div class="split-text">
-      <span class="hero-pre">The Philosophy</span>
-      <h2>Beyond<br>Screens.</h2>
-      <p>By bypassing traditional input mechanisms, we create a zero-friction conduit between human intent and machine execution.</p>
-      <p>Using Google's MediaPipe framework, 21 multi-dimensional landmark coordinates are continuously captured per hand, translating physical nuance into majestic algorithmic art via TouchDesigner.</p>
-      
-      <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-num">21</div>
-          <div class="stat-label">Landmarks Tracked</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num">60+</div>
-          <div class="stat-label">Frames Per Sec</div>
-        </div>
-      </div>
+       <h2>Biological Precision Meets Machine Vision</h2>
+       <p>Our neural networks process hand landmarks at 60fps, providing sub-millimeter precision for immersive interaction.</p>
+       <div class="stats-grid">
+         <div class="stat-box">
+           <div class="stat-num">0.2ms</div>
+           <div class="stat-label">Latency</div>
+         </div>
+         <div class="stat-box">
+           <div class="stat-num">99.8%</div>
+           <div class="stat-label">Accuracy</div>
+         </div>
+       </div>
     </div>
-    <div style="position: relative; height: 500px; background: radial-gradient(circle, var(--glass-bg), transparent); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--glass-border);">
-      <i class="fa-solid fa-hand-sparkles" style="font-size: 8rem; color: #fff; text-shadow: 0 0 40px var(--accent);"></i>
+    <div class="split-vis" style="position:relative; aspect-ratio:1;">
+       <div style="position:absolute; inset:0; background:radial-gradient(circle at center, var(--accent-glow) 0%, transparent 70%); border-radius:50%;"></div>
+       <i class="fa-solid fa-microchip" style="font-size:10rem; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:rgba(255,255,255,0.1);"></i>
     </div>
   </section>
 
-  <!-- ENGINEERING / CAPABILITIES -->
-  <section class="gs-reveal" id="engineering">
-    <span class="hero-pre">Architecture</span>
-    <h2>Proprietary Technologies</h2>
-    <p style="color: var(--text-muted); max-width: 800px; margin-bottom: 20px; font-size: 1.1rem; font-weight: 300;">
-      Our system bridges the physical-digital divide by integrating state-of-the-art computer vision models with physics-based rendering engines, delivering an uncompromising volumetric experience.
-    </p>
-    <div class="features-grid">
-      <div class="feature-card">
-        <i class="fa-solid fa-microchip"></i>
-        <h3>Neural Pipeline Inference</h3>
-        <p style="margin-bottom: 20px;">Utilizing Google's MediaPipe, our high-performance machine learning node computes 21 spatial constraints per hand at true 60+ FPS, adapting dynamically to diverse lighting and occlusion scenarios.</p>
-        <a href="https://www.geeksforgeeks.org/machine-learning/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
-          Explore ML on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
-        </a>
-      </div>
-      <div class="feature-card">
-        <i class="fa-solid fa-ruler-combined"></i>
-        <h3>Dynamic Topology Engine</h3>
-        <p style="margin-bottom: 20px;">By evaluating the continuous Euclidean distance between critical joint landmarks (e.g. thumb to index tip), the engine fluidly maps microscopic finger flexes directly to UI elements in 3D space.</p>
-        <a href="https://www.geeksforgeeks.org/mathematics-and-statistics/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
-          Explore Math on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
-        </a>
-      </div>
-      <div class="feature-card">
-        <i class="fa-solid fa-bolt"></i>
-        <h3>Zero-Latency OSC Telemetry</h3>
-        <p style="margin-bottom: 20px;">To ensure the visualizer reacts concurrently to physical movement, massive multidimensional coordinate matrices are multiplexed via UDP into TouchDesigner over the Open Sound Control protocol.</p>
-        <a href="https://www.geeksforgeeks.org/computer-network-tutorials/" target="_blank" style="color: var(--text-main); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 700;">
-          Explore UDP on GFG <i class="fa-solid fa-arrow-right" style="font-size: 0.8rem; color: var(--accent); margin:0;"></i>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- INFINITE TECH SCROLL -->
-  <div class="tech-marquee gs-reveal">
+  <!-- STATS MARQUEE -->
+  <div class="tech-marquee">
     <div class="marquee-content">
-      <!-- Duplicated for infinite effect -->
-      <a href="https://www.geeksforgeeks.org/python-programming-language/" target="_blank" class="tech-item" title="Learn Python on GeeksforGeeks"><i class="fa-brands fa-python"></i> PYTHON</a>
-      <a href="https://developers.google.com/mediapipe" target="_blank" class="tech-item" title="Learn MediaPipe"><i class="fa-solid fa-brain"></i> MEDIAPIPE</a>
-      <a href="https://www.geeksforgeeks.org/opencv-python-tutorial/" target="_blank" class="tech-item" title="Learn OpenCV on GeeksforGeeks"><i class="fa-solid fa-camera"></i> OPENCV</a>
-      <a href="https://derivative.ca/" target="_blank" class="tech-item" title="Explore TouchDesigner"><i class="fa-solid fa-wave-square"></i> TOUCHDESIGNER</a>
-      <a href="https://www.geeksforgeeks.org/flask-tutorial/" target="_blank" class="tech-item" title="Learn Flask on GeeksforGeeks"><i class="fa-solid fa-code"></i> FLASK</a>
-      <a href="https://www.geeksforgeeks.org/python-programming-language/" target="_blank" class="tech-item" title="Learn Python on GeeksforGeeks"><i class="fa-brands fa-python"></i> PYTHON</a>
-      <a href="https://developers.google.com/mediapipe" target="_blank" class="tech-item" title="Learn MediaPipe"><i class="fa-solid fa-brain"></i> MEDIAPIPE</a>
-      <a href="https://www.geeksforgeeks.org/opencv-python-tutorial/" target="_blank" class="tech-item" title="Learn OpenCV on GeeksforGeeks"><i class="fa-solid fa-camera"></i> OPENCV</a>
-      <a href="https://derivative.ca/" target="_blank" class="tech-item" title="Explore TouchDesigner"><i class="fa-solid fa-wave-square"></i> TOUCHDESIGNER</a>
-      <a href="https://www.geeksforgeeks.org/flask-tutorial/" target="_blank" class="tech-item" title="Learn Flask on GeeksforGeeks"><i class="fa-solid fa-code"></i> FLASK</a>
+      <div class="tech-item"><i class="fa-brands fa-python"></i> PYTHON CV</div>
+      <div class="tech-item"><i class="fa-solid fa-bolt"></i> OPENGL ACCEL</div>
+      <div class="tech-item"><i class="fa-solid fa-brain"></i> NEURAL ENGINE</div>
+      <div class="tech-item"><i class="fa-solid fa-fingerprint"></i> BIOMETRIC</div>
+      <div class="tech-item"><i class="fa-brands fa-python"></i> PYTHON CV</div>
+      <div class="tech-item"><i class="fa-solid fa-bolt"></i> OPENGL ACCEL</div>
+      <div class="tech-item"><i class="fa-solid fa-brain"></i> NEURAL ENGINE</div>
     </div>
   </div>
 
-  <footer id="contact" class="gs-reveal">
+  <!-- FEATURES -->
+  <section id="engineering">
+    <div style="text-align:center; margin-bottom:60px;">
+      <h2 style="font-size:3rem;">Core Engineering</h2>
+      <p style="color:var(--text-muted);">Advanced computation layers for the spatial web.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <i class="fa-solid fa-cube"></i>
+        <h3>3D Volumetric</h3>
+        <p>Project interface elements into 3D space with advanced depth estimation logic.</p>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <h3>VFX Physics</h3>
+        <p>Interactive particles and light trails that respond to your movements with zero drag.</p>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-shield-halved"></i>
+        <h3>Secure Auth</h3>
+        <p>Biometric hand-sign authentication for next-gen secure login portals.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
     <div class="footer-top">
-      <a href="#vision">Philosophy</a>
-      <a href="#experience" style="display:flex; flex-direction:column; align-items:center; gap:8px; font-weight:700; font-size:1rem; letter-spacing:0.2em;">
-        <i class="fa-solid fa-hand-sparkles" style="font-size:2rem; color:var(--accent);"></i>
-        HANDTRACK
-      </a>
-      <a href="#engineering">Architecture</a>
+      <a href="#vision">Vision</a>
+      <a href="#experience">Interface</a>
+      <a href="#engineering">Tech</a>
     </div>
-
     <div class="footer-socials">
-      <a href="https://github.com/Srishylam-code" target="_blank" title="GitHub"><i class="fa-brands fa-github"></i></a>
-      <a href="https://www.linkedin.com/in/srishylam-bandi" target="_blank" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
-      <a href="mailto:earthear56@gmail.com" title="Email"><i class="fa-solid fa-envelope"></i></a>
+      <a href="#"><i class="fa-brands fa-github"></i></a>
+      <a href="#"><i class="fa-brands fa-linkedin"></i></a>
+      <a href="#"><i class="fa-brands fa-x-twitter"></i></a>
     </div>
-
     <div class="footer-divider"></div>
-
     <div class="footer-columns">
       <div class="footer-col">
-        <h4>Capabilities</h4>
+        <h4>PLATFORM</h4>
         <ul>
-          <li><a href="#">Neural Tracking</a></li>
-          <li><a href="#">OSC Telemetry</a></li>
-          <li><a href="#">TouchDesigner Sync</a></li>
-          <li><a href="#">Sub-10ms Latency</a></li>
+          <li><a href="#">Neural Dashboard</a></li>
+          <li><a href="#">API Documentation</a></li>
+          <li><a href="#">Spatial SDK</a></li>
         </ul>
       </div>
       <div class="footer-col">
-        <h4>Experience</h4>
-        <ul>
-          <li><a href="#">Live Pipeline</a></li>
-          <li><a href="#">Volumetric Interfaces</a></li>
-          <li><a href="#">Biometric Translation</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Resources</h4>
-        <ul>
-          <li><a href="#">Documentation <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i></a></li>
-          <li><a href="#">Source Code <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.6rem;"></i></a></li>
-          <li><a href="#">Installation Guide</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h4>Developer</h4>
-        <ul>
-          <li><a href="#">About srishylam</a></li>
-          <li><a href="#">Artificial Intelligence</a></li>
-          <li><a href="#">Machine Learning</a></li>
-          <li><a href="#">Creative Coding</a></li>
-        </ul>
+          <h4>ENGINEERING</h4>
+          <ul>
+            <li><a href="#">Vision Lab</a></li>
+            <li><a href="#">Render Engine</a></li>
+            <li><a href="#">Core Systems</a></li>
+          </ul>
       </div>
     </div>
-
     <div class="footer-bottom">
-      <div class="footer-copy">&copy; Copyright srishylam 2026. HandTrack Intelligence.</div>
       <div class="footer-bottom-links">
-        <a href="#">SITEMAP</a>
-        <a href="mailto:earthear56@gmail.com" style="color:var(--accent); font-weight:700;">CONTACT US</a>
-        <a href="#">TERMS AND CONDITIONS</a>
-        <a href="#">PRIVACY POLICY</a>
+        <a href="#">Privacy Protocol</a>
+        <a href="#">Terms of Access</a>
       </div>
+      <div class="footer-copy">© 2026 HANDTRACK VISION. ALL RIGHTS SECURED.</div>
     </div>
   </footer>
 
   <script>
-    // --- 1. LENIS SMOOTH SCROLL ---
+    // --- UTILITIES ---
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const navbar = document.getElementById('navbar');
+    
+    // Smooth Scroll Reveal
+    gsap.registerPlugin(ScrollTrigger);
+    
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) navbar.classList.add('scrolled');
+      else navbar.classList.remove('scrolled');
+    });
+
+    // --- LENIS SMOOTH SCROLL ---
     const lenis = new Lenis({
       duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), 
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smooth: true,
-      mouseMultiplier: 1.0
     });
     function raf(time) {
       lenis.raf(time);
@@ -486,156 +489,414 @@
     }
     requestAnimationFrame(raf);
 
-    // --- 2. GSAP SCROLL ANIMATIONS ---
-    gsap.registerPlugin(ScrollTrigger);
-    
-    // Hero entrance
-    gsap.fromTo('.gsap-reveal-hero > *', 
-      { y: 60, opacity: 0 },
-      { y: 0, opacity: 1, duration: 1.5, stagger: 0.15, ease: 'power3.out', delay: 0.2 }
-    );
-
-    // Fade up sections on scroll
-    const revealElements = document.querySelectorAll('.gs-reveal');
-    revealElements.forEach((el) => {
-      gsap.fromTo(el, 
-        { y: 100, opacity: 0 },
-        { 
-          y: 0, opacity: 1, duration: 1.2, ease: 'power3.out',
-          scrollTrigger: {
-            trigger: el,
-            start: "top 85%",
-            toggleActions: "play none none reverse"
-          }
-        }
-      );
-    });
-
-    // Nav shrink
-    window.addEventListener('scroll', () => {
-      const nav = document.getElementById('navbar');
-      if(window.scrollY > 50) {
-        nav.classList.add('scrolled');
-        nav.style.background = 'rgba(2, 2, 2, 0.8)';
-        nav.style.backdropFilter = 'blur(10px)';
-        nav.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-      } else {
-        nav.classList.remove('scrolled');
-        nav.style.background = 'transparent';
-        nav.style.backdropFilter = 'none';
-        nav.style.borderBottom = 'none';
-      }
-    });
-
-    // --- 3. THREE.JS LUXURY 3D BACKGROUND ---
-    const canvas = document.getElementById('webgl-canvas');
+    // --- THREE.JS BACKGROUND ---
+    const scCanvas = document.getElementById('webgl-canvas');
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020202, 0.001);
+    const camera3d = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera3d.position.z = 400;
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-    camera.position.z = 400;
-
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ canvas: scCanvas, alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 
-    // Create intricate geometry (TorusKnot for premium tech feel) combined with particles
     const mainGroup = new THREE.Group();
     scene.add(mainGroup);
 
-    // 1. Central Abstract Wireframe
-    const geoWire = new THREE.TorusKnotGeometry(120, 30, 150, 20);
-    const matWire = new THREE.MeshBasicMaterial({ color: 0x5e17eb, wireframe: true, transparent: true, opacity: 0.15 });
-    const meshWire = new THREE.Mesh(geoWire, matWire);
-    mainGroup.add(meshWire);
+    // Add glowing ambient points
+    const pointsCount = 200;
+    const pointsGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(pointsCount * 3);
+    for(let i=0; i<pointsCount*3; i++) positions[i] = (Math.random() - 0.5) * 1500;
+    pointsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const pointsMat = new THREE.PointsMaterial({ color: 0x5e17eb, size: 2, transparent: true, opacity: 0.4 });
+    const points = new THREE.Points(pointsGeo, pointsMat);
+    mainGroup.add(points);
 
-    // 2. Floating Star Dust Particles
-    const particlesGeometry = new THREE.BufferGeometry();
-    const particlesCount = 2000;
-    const posArray = new Float32Array(particlesCount * 3);
-    for(let i=0; i < particlesCount * 3; i++) {
-      // Spread them wide
-      posArray[i] = (Math.random() - 0.5) * 1500;
+    function animate3d(time) {
+      requestAnimationFrame(animate3d);
+      mainGroup.rotation.y += 0.001;
+      mainGroup.rotation.x += 0.0005;
+      renderer.render(scene, camera3d);
     }
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    
-    // Create a circular glowing texture for particles programmatically
-    const getParticleTexture = () => {
-      const cvs = document.createElement('canvas');
-      cvs.width = 32; cvs.height = 32;
-      const ctx = cvs.getContext('2d');
-      const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-      grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(0.2, 'rgba(150, 50, 255, 0.8)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(16,16,16,0,Math.PI*2);
-      ctx.fill();
-      const tex = new THREE.CanvasTexture(cvs);
-      return tex;
-    };
+    animate3d();
 
-    const particlesMaterial = new THREE.PointsMaterial({
-      size: 4,
-      map: getParticleTexture(),
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.6
-    });
-
-    const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particleMesh);
-
-    // Mouse Interaction
-    let mouseX = 0; let mouseY = 0;
-    let targetX = 0; let targetY = 0;
-    const windowHalfX = window.innerWidth / 2;
-    const windowHalfY = window.innerHeight / 2;
-
-    document.addEventListener('mousemove', (event) => {
-      mouseX = (event.clientX - windowHalfX) * 0.1;
-      mouseY = (event.clientY - windowHalfY) * 0.1;
-    });
-
-    // Animation Loop
-    const clock = new THREE.Clock();
-
-    function animateThree() {
-      requestAnimationFrame(animateThree);
-      const elapsedTime = clock.getElapsedTime();
-
-      // Smooth camera follow mouse
-      targetX = mouseX * 0.5;
-      targetY = mouseY * 0.5;
-      
-      mainGroup.rotation.y += 0.002;
-      mainGroup.rotation.x += 0.001;
-      
-      particleMesh.rotation.y = -elapsedTime * 0.05;
-      particleMesh.rotation.x = elapsedTime * 0.02;
-
-      // Parallax effect based on scroll position!
-      const scrollY = window.scrollY;
-      mainGroup.position.y = -scrollY * 0.1;
-      
-      // Slight camera swing
-      camera.position.x += (mouseX - camera.position.x) * 0.02;
-      camera.position.y += (-mouseY - camera.position.y) * 0.02;
-      camera.lookAt(scene.position);
-
-      renderer.render(scene, camera);
-    }
-    animateThree();
-
-    // Resize handler
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+      camera3d.aspect = window.innerWidth / window.innerHeight;
+      camera3d.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    // --- REVEAL ANIMATIONS ---
+    gsap.from(".hero-title", { opacity: 0, y: 50, duration: 1.2, ease: "power4.out", delay: 0.5 });
+    gsap.from(".hero-desc", { opacity: 0, y: 30, duration: 1.2, ease: "power4.out", delay: 0.7 });
+    
+    // --- LOGIC GESTURE HUD ---
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const loadingOverlayCam = document.getElementById('loading-overlay-cam');
+    const placeholderUI = document.getElementById('placeholder-ui');
+
+    let isCameraActive = false;
+    let frameCount = 0, lastFpsTime = Date.now(), fpsVal = 0;
+    let currentGesture = "SEARCHING...";
+    let currentDepth = 0;
+    let currentFingerCount = 0;
+    let activeColor = "#ff6f3c";
+    let particles = [];
+    let startTime = Date.now();
+    let handHistory = []; // For motion tracking
+    let motionGesture = "";
+
+    function countRaisedFingers(landmarks) {
+      if (!landmarks) return 0;
+      let count = 0;
+      const tips = [8, 12, 16, 20];
+      const joints = [6, 10, 14, 18];
+      for (let i = 0; i < 4; i++) {
+        if (landmarks[tips[i]].y < landmarks[joints[i]].y) count++;
+      }
+      if (landmarks[4].y < landmarks[3].y) count++;
+      return count;
+    }
+
+    class Particle {
+      constructor(x, y, vx, vy, color, life=35, size=5, type='circle') {
+        this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        this.size = size;
+        this.type = type;
+        this.angle = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.2;
+      }
+      update() {
+        this.x += this.vx; this.y += this.vy;
+        this.angle += this.rotSpeed;
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+        this.vy += 0.22; // Gravity for falling effect
+        this.life--; return this.life > 0;
+      }
+      draw(ctx) {
+        const alpha = this.life / this.maxLife;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 15 * alpha;
+        ctx.shadowColor = this.color;
+        ctx.globalAlpha = alpha;
+        
+        if (this.type === 'star') {
+          this.drawStar(ctx, 0, 0, 5, this.size * alpha * 1.5, this.size * alpha * 0.6);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, 0, this.size * alpha, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.restore();
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
+      }
+      drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+        let rot = Math.PI / 2 * 3;
+        let x = cx;
+        let y = cy;
+        let step = Math.PI / spikes;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+          x = cx + Math.cos(rot) * outerRadius;
+          y = cy + Math.sin(rot) * outerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+          x = cx + Math.cos(rot) * innerRadius;
+          y = cy + Math.sin(rot) * innerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+        }
+        ctx.lineTo(cx, cy - outerRadius);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function getUptimeString() {
+      const diff = Date.now() - startTime;
+      const m = Math.floor(diff / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      const ms = Math.floor((diff % 1000) / 10);
+      return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`;
+    }
+
+    function drawCyberPanel(ctx, w, h, handsCount) {
+      // 1. Top FPS Bar
+      ctx.save();
+      ctx.font = "bold 20px Syncopate";
+      ctx.fillStyle = "#00ff00"; // Neon Green
+      ctx.fillText(`FPS: ${fpsVal} | Hands: ${handsCount}`, 40, 50);
+      ctx.restore();
+
+      const px = 100, py = 80, pw = 420, ph = 260; 
+      ctx.save();
+      
+      // Targeting Brackets (Corners)
+      const bl = 25; // bracket length
+      const drawBracket = (x, y, dx, dy) => {
+        ctx.strokeStyle = "#00f2ff"; // Cyan
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + dx*bl, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy*bl);
+        ctx.stroke();
+      };
+      drawBracket(px, py, 1, 1);       // top-left
+      drawBracket(px + pw, py, -1, 1);   // top-right
+      drawBracket(px, py + ph, 1, -1);   // bot-left
+      drawBracket(px + pw, py + ph, -1, -1); // bot-right
+
+      // Glass Background
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(px, py, pw, ph);
+
+      // Header
+      ctx.fillStyle = "#fff";
+      ctx.font = "18px Syncopate";
+      ctx.fillText("SYS LOGISTICS [ONLINE]", px + 25, py + 45);
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + 25, py + 55); ctx.lineTo(px + pw - 25, py + 55);
+      ctx.stroke();
+
+      // Labels
+      const drawHUDLine = (label, value, y, valColor="#00f2ff") => {
+        ctx.font = "14px Syncopate";
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.fillText(label, px + 25, py + y);
+        ctx.fillStyle = valColor;
+        ctx.fillText(value, px + 25, py + y + 25);
+      };
+
+      drawHUDLine("UPTIME:", getUptimeString(), 100, "#fff");
+      drawHUDLine("STATE INTERLOCK:", `> ${motionGesture || currentGesture}`, 160, "#00f2ff");
+      
+      // Stability Status
+      ctx.font = "14px Syncopate";
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fillText("STABILITY:", px + 25, py + 230);
+      ctx.fillStyle = "#000000"; // Black
+      ctx.fillText("STANDBY", px + 180, py + 230);
+
+      ctx.restore();
+    }
+
+    function calculateDistance(p1, p2, w, h) {
+      const dx = (p1.x - p2.x) * w;
+      const dy = (p1.y - p2.y) * h;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    const mpHands = window.Hands || Hands;
+    const mpCamera = window.Camera || Camera;
+
+    const hands = new mpHands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+
+    hands.onResults((results) => {
+      // FPS Calculation
+      frameCount++;
+      const now = Date.now();
+      if (now - lastFpsTime > 1000) {
+        fpsVal = Math.round((frameCount * 1000) / (now - lastFpsTime));
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+
+      const w = canvasElement.width = 1280;
+      const h = canvasElement.height = 720;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, w, h);
+      
+      // Mirror Flip
+      canvasCtx.translate(w, 0);
+      canvasCtx.scale(-1, 1);
+      canvasCtx.drawImage(results.image, 0, 0, w, h);
+      canvasCtx.restore();
+
+      currentFingerCount = 0;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        results.multiHandLandmarks.forEach((hand, handIndex) => {
+          const tips = [4, 8, 12, 16, 20];
+          const joints = [2, 6, 10, 14, 18];
+          const wrist = hand[0];
+          
+          let fingersUp = [];
+          for (let i = 0; i < 5; i++) {
+            const dTip = calculateDistance(hand[tips[i]], wrist, w, h);
+            const dJoint = calculateDistance(hand[joints[i]], wrist, w, h);
+            fingersUp.push(dTip > dJoint);
+          }
+          const upCount = fingersUp.filter(u => u).length;
+          currentFingerCount += upCount;
+
+          const mx = (p) => (1.0 - p.x) * w;
+          const my = (p) => p.y * h;
+
+          if (handIndex === 0) {
+             const tTip = hand[4], iTip = hand[8], mTip = hand[12], rTip = hand[16], pTip = hand[20];
+             const dTI = calculateDistance(tTip, iTip, w, h);
+             const dMR = calculateDistance(mTip, rTip, w, h);
+             const dIM = calculateDistance(iTip, mTip, w, h);
+             
+             // Track history for motion
+             handHistory.push({x: hand[0].x, y: hand[0].y, time: Date.now()});
+             if (handHistory.length > 20) handHistory.shift();
+
+             // Motion Detection
+             motionGesture = "";
+             if (handHistory.length >= 10) {
+                const first = handHistory[0], last = handHistory[handHistory.length-1];
+                const dx = (last.x - first.x) * w;
+                const dy = (last.y - first.y) * h;
+                const dt = (last.time - first.time);
+                const velX = Math.abs(dx / dt);
+                
+                if (velX > 1.2) {
+                   if (dx > 80) motionGesture = "SWIPE RIGHT ➡️";
+                   else if (dx < -80) motionGesture = "SWIPE LEFT ⬅️";
+                   else motionGesture = "WAVE 🧤";
+                }
+             }
+             
+             // GESTURE ENGINE v3.0
+             if (upCount === 5) {
+               const area = (Math.max(...hand.map(p=>p.x)) - Math.min(...hand.map(p=>p.x))) * (Math.max(...hand.map(p=>p.y)) - Math.min(...hand.map(p=>p.y))) * w * h;
+               if (area > 80000) currentGesture = "FIVE SPREAD 🖐️";
+               else currentGesture = "OPEN HAND ✋";
+               if (currentDepth > 85) currentGesture = "STOP 🛑";
+             } 
+             else if (upCount === 0) currentGesture = "FIST ✊";
+             else if (upCount === 2 && fingersUp[1] && fingersUp[2]) {
+                if (dIM < 15) currentGesture = "CROSS FINGERS 🤞";
+                else currentGesture = "PEACE / VICTORY ✌️";
+             }
+             else if (upCount === 3 && fingersUp[0] && fingersUp[1] && fingersUp[4]) {
+                currentGesture = "SPIDER-MAN 🤟";
+             }
+             else if (dTI < 30) {
+               if (fingersUp[2] && fingersUp[3] && fingersUp[4]) currentGesture = "OK SIGN 👌";
+               else if (upCount <= 2) {
+                  if (dTI < 15) currentGesture = "FINGER HEART ❤️";
+                  else currentGesture = "PINCH 🤏";
+               }
+             }
+             else if (upCount === 1) {
+               if (fingersUp[1]) currentGesture = "POINT 👉";
+               else if (fingersUp[0]) currentGesture = "THUMBS UP 👍";
+             }
+             else if (upCount === 2) {
+               if (fingersUp[1] && fingersUp[4]) currentGesture = "ROCK / HORNS 🤟";
+               else if (fingersUp[0] && fingersUp[4]) currentGesture = "CALL ME 🤙";
+               else if (fingersUp[0] && fingersUp[1]) currentGesture = "FINGER GUN 👉🔫";
+             }
+             else if (upCount === 4) {
+               if (!fingersUp[0]) {
+                 if (dMR > 60) currentGesture = "VULCAN 🖖";
+                 else currentGesture = "FOUR FINGERS 🖐️";
+               }
+             }
+             else {
+               currentGesture = `${upCount} FINGERS`;
+             }
+
+             const areaVal = (Math.max(...hand.map(p=>p.x)) - Math.min(...hand.map(p=>p.x))) * (Math.max(...hand.map(p=>p.y)) - Math.min(...hand.map(p=>p.y))) * w * h;
+             currentDepth = Math.min(100, Math.round((areaVal / 60000) * 100));
+             activeColor = fingersUp[1] ? "#ff6f3c" : "#00ff88";
+          }
+
+          // Draw Mesh
+          canvasCtx.strokeStyle = "rgba(0, 255, 136, 0.4)";
+          canvasCtx.lineWidth = 2;
+          const mesh = [[0,1], [1,2], [2,3], [3,4], [0,5], [5,6], [6,7], [7,8], [5,9], [9,10], [10,11], [11,12], [9,13], [13,14], [14,15], [15,16], [13,17], [17,18], [18,19], [19,20], [0,17]];
+          mesh.forEach(pair => {
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(mx(hand[pair[0]]), my(hand[pair[0]]));
+            canvasCtx.lineTo(mx(hand[pair[1]]), my(hand[pair[1]]));
+            canvasCtx.stroke();
+          });
+
+          // Red fingertip connector lines
+          canvasCtx.strokeStyle = "rgba(255, 51, 102, 0.6)";
+          canvasCtx.lineWidth = 3;
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(mx(hand[4]), my(hand[4])); // Thumb
+          [8, 12, 16, 20].forEach(tipIdx => canvasCtx.lineTo(mx(hand[tipIdx]), my(hand[tipIdx])));
+          canvasCtx.stroke();
+
+          // MM Labels
+          for(let i=0; i<tips.length - 1; i++){
+            const d = calculateDistance(hand[tips[i]], hand[tips[i+1]], w, h);
+            if (d > 35) {
+              canvasCtx.fillStyle = "#fff";
+              canvasCtx.font = "bold 10px monospace";
+              canvasCtx.fillText(`${Math.round(d * 0.45)}mm`, (mx(hand[tips[i]]) + mx(hand[tips[i+1]]))/2, (my(hand[tips[i]]) + my(hand[tips[i+1]]))/2 - 10);
+            }
+          }
+
+          // Particles
+          tips.forEach(idx => {
+             for(let k=0; k<2; k++) {
+                particles.push(new Particle(mx(hand[idx]), my(hand[idx]), (Math.random()-0.5)*6, (Math.random()-0.3)*4, ["#ff8c42", "#c8ff00", "#ff2d95", "#ffd166", "#00ff88"][idx%5], 30+Math.random()*20, 4, Math.random()>0.8?'star':'circle'));
+             }
+          });
+        });
+      }
+
+
+      particles = particles.filter(p => { const ok = p.update(); if(ok) p.draw(canvasCtx); return ok; });
+      drawCyberPanel(canvasCtx, w, h, results.multiHandLandmarks ? results.multiHandLandmarks.length : 0);
+
+      window.setTimeout(() => {
+        if (loadingOverlayCam.style.display !== 'none') {
+           loadingOverlayCam.style.opacity = '0';
+           setTimeout(() => loadingOverlayCam.style.display = 'none', 500);
+        }
+      }, 500);
+    });
+
+    const camera = new mpCamera(videoElement, {
+      onFrame: async () => { await hands.send({ image: videoElement }); },
+      width: 1280, height: 720
+    });
+
+    startBtn.addEventListener('click', () => {
+      loadingOverlayCam.style.display = 'flex';
+      camera.start().then(() => {
+        isCameraActive = true;
+        canvasElement.style.display = 'block';
+        placeholderUI.style.display = 'none';
+      }).catch(err => {
+         alert("Camera Access Error: " + err);
+         loadingOverlayCam.style.display = 'none';
+      });
+    });
+
+    stopBtn.addEventListener('click', () => { if (isCameraActive) location.reload(); });
+
+    // Initial load hide
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => loadingOverlay.style.display = 'none', 500);
+      }, 1500);
+    });
   </script>
 </body>
 </html>

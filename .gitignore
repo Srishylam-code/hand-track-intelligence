@@ -1,5 +1,6 @@
 # Security & Environment
 .env
+users.xlsx
 
 # Python Caches and Virtual Environments
 __pycache__/
@@ -8,3 +9,6 @@ __pycache__/
 venv/
 dist/
 build/
+
+# Legacy Archive (Optional: Keep it locally or push it)
+# legacy_archive/
