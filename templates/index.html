@@ -1,1597 +1,1271 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
-  <title>NEURAL HAND — AI Interface</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0"/>
+<title>NEURAL HAND v2.0 — AI Interface</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg0:#06080f;--bg1:#0b0f1c;--bg2:#0f1428;--bg3:#131830;
+  --cyan:#00e5ff;--purple:#7c3aed;--pink:#e040fb;--green:#00e676;--amber:#ffc107;--red:#ff1744;
+  --c1:rgba(0,229,255,0.12);--c2:rgba(124,58,237,0.12);
+  --border:rgba(0,229,255,0.15);--border2:rgba(124,58,237,0.2);
+  --text:#c8e6f5;--muted:rgba(150,190,220,0.5);
+  --panel:rgba(8,13,28,0.88);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--bg0);color:var(--text);font-family:'Inter',sans-serif;overflow:hidden;font-size:13px}
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet"/>
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+/* BOOT */
+#boot{position:fixed;inset:0;z-index:9999;background:var(--bg0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+#boot-logo{font-family:'Orbitron',sans-serif;font-size:clamp(2.2rem,5vw,4rem);font-weight:900;color:var(--cyan);letter-spacing:.25em;text-shadow:0 0 30px var(--cyan),0 0 80px rgba(0,229,255,.4);animation:logoPulse 1.8s ease infinite alternate}
+@keyframes logoPulse{from{text-shadow:0 0 20px var(--cyan)}to{text-shadow:0 0 50px var(--cyan),0 0 100px rgba(0,229,255,.5),0 0 180px rgba(124,58,237,.3)}}
+#boot-ver{font-size:.65rem;letter-spacing:.5em;color:var(--muted);text-transform:uppercase}
+#boot-track{width:280px;height:2px;background:rgba(0,229,255,.1);border-radius:2px;overflow:hidden}
+#boot-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--pink));box-shadow:0 0 10px var(--cyan);transition:width .07s linear}
+#boot-msg{font-family:'Share Tech Mono',monospace;font-size:.6rem;letter-spacing:.2em;color:var(--cyan);opacity:.7;min-height:1em}
 
-  <!-- Three.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-  <!-- GSAP -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+/* BACKGROUND */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.6}
+#scan{position:fixed;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.08) 3px,rgba(0,0,0,.08) 4px)}
 
-  <style>
-    :root {
-      --bg:        #020509;
-      --cyan:      #00f5ff;
-      --purple:    #b44dff;
-      --pink:      #ff2d78;
-      --green:     #00ff88;
-      --dim:       rgba(0,245,255,0.08);
-      --dim2:      rgba(180,77,255,0.08);
-      --border:    rgba(0,245,255,0.18);
-      --border2:   rgba(180,77,255,0.22);
-      --text:      #e0f4ff;
-      --muted:     rgba(180,220,255,0.45);
-      --glow-c:    0 0 20px rgba(0,245,255,0.7), 0 0 50px rgba(0,245,255,0.3);
-      --glow-p:    0 0 20px rgba(180,77,255,0.7), 0 0 50px rgba(180,77,255,0.3);
-    }
+/* MAIN SHELL */
+#shell{position:fixed;inset:0;z-index:10;display:grid;grid-template-columns:200px 1fr 280px;grid-template-rows:48px 1fr 190px;gap:6px;padding:6px;opacity:0;transition:opacity .6s}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* TOPBAR */
+#topbar{grid-column:1/-1;display:flex;align-items:center;gap:0;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:0 14px;overflow:hidden;position:relative}
+#topbar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,229,255,.03),transparent);animation:sweep 5s linear infinite}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.tb-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:.95rem;color:var(--cyan);letter-spacing:.2em;text-shadow:0 0 16px var(--cyan);margin-right:24px;white-space:nowrap}
+.tb-logo span{color:var(--purple)}
+.tb-sep{width:1px;height:28px;background:var(--border);margin:0 16px}
+.tb-group{display:flex;flex-direction:column;gap:1px;margin-right:20px}
+.tb-label{font-size:.48rem;letter-spacing:.25em;color:var(--muted);text-transform:uppercase}
+.tb-val{font-family:'Orbitron',sans-serif;font-size:.65rem;font-weight:600}
+.tb-val.online{color:var(--green);text-shadow:0 0 8px var(--green)}
+.tb-val.cyan{color:var(--cyan)}
+.tb-val.amber{color:var(--amber)}
+#tb-clock{font-family:'Orbitron',sans-serif;font-size:.85rem;color:var(--cyan);margin-left:auto;text-shadow:0 0 12px var(--cyan);letter-spacing:.15em}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.4s ease infinite alternate;margin-right:5px}
+@keyframes blink{from{opacity:.4;box-shadow:0 0 4px var(--green)}to{opacity:1;box-shadow:0 0 14px var(--green)}}
 
-    html, body {
-      width: 100%; height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Share Tech Mono', monospace;
-      overflow: hidden;
-    }
+/* LEFT SIDEBAR */
+#sidebar{grid-column:1;grid-row:2/4;background:var(--panel);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.sb-nav{display:flex;flex-direction:column;padding:10px 0;border-bottom:1px solid rgba(0,229,255,.08)}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:all .25s;color:var(--muted);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;border-left:2px solid transparent}
+.sb-item i{width:16px;text-align:center;font-size:.8rem}
+.sb-item:hover{color:var(--text);background:rgba(0,229,255,.05)}
+.sb-item.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(0,229,255,.07);text-shadow:0 0 8px rgba(0,229,255,.4)}
+.sb-divider{height:1px;background:rgba(0,229,255,.07);margin:6px 12px}
+.sb-section{padding:12px 14px 6px;font-size:.5rem;letter-spacing:.3em;color:var(--muted);text-transform:uppercase}
 
-    /* ===================== BOOT SCREEN ===================== */
-    #boot-screen {
-      position: fixed; inset: 0; z-index: 9999;
-      background: var(--bg);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 28px;
-    }
-    #boot-logo {
-      font-family: 'Orbitron', sans-serif;
-      font-size: clamp(2rem,6vw,4.5rem);
-      font-weight: 900;
-      color: var(--cyan);
-      text-shadow: var(--glow-c);
-      letter-spacing: 0.22em;
-      animation: logoPulse 1.6s ease infinite alternate;
-    }
-    @keyframes logoPulse {
-      from { text-shadow: var(--glow-c); }
-      to   { text-shadow: 0 0 40px rgba(0,245,255,1), 0 0 80px rgba(0,245,255,0.6), 0 0 120px rgba(180,77,255,0.4); }
-    }
-    #boot-sub {
-      font-size: 0.75rem; letter-spacing: 0.4em;
-      color: var(--muted); text-transform: uppercase;
-    }
-    #boot-bar-wrap {
-      width: 320px; height: 2px;
-      background: rgba(0,245,255,0.15);
-      border-radius: 2px; overflow: hidden;
-    }
-    #boot-bar {
-      height: 100%; width: 0%;
-      background: linear-gradient(90deg, var(--cyan), var(--purple));
-      box-shadow: 0 0 12px var(--cyan);
-      transition: width 0.06s linear;
-    }
-    #boot-status {
-      font-size: 0.65rem; letter-spacing: 0.25em;
-      color: var(--cyan); opacity: 0.7;
-      min-height: 1em;
-    }
+/* Tracking Overview */
+#track-overview{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.ov-title{font-family:'Orbitron',sans-serif;font-size:.55rem;letter-spacing:.3em;color:var(--cyan);text-transform:uppercase;margin-bottom:4px}
+.ov-ring-wrap{display:flex;justify-content:center;margin:6px 0}
+#acc-ring{width:90px;height:90px}
+.ov-row{display:flex;justify-content:space-between;align-items:center;font-size:.62rem;padding:4px 0;border-bottom:1px solid rgba(0,229,255,.06)}
+.ov-row:last-child{border:none}
+.ov-key{color:var(--muted)}
+.ov-val{font-family:'Share Tech Mono',monospace}
+.ov-val.good{color:var(--green);text-shadow:0 0 6px var(--green)}
+.ov-val.cyan{color:var(--cyan)}
+.ov-val.amber{color:var(--amber)}
 
-    /* ===================== THREE.JS BACKGROUND ===================== */
-    #bg-canvas {
-      position: fixed; inset: 0; z-index: 0;
-      pointer-events: none;
-    }
+/* System Metrics */
+#sys-metrics{padding:10px 14px;border-top:1px solid rgba(0,229,255,.08)}
+.sm-title{font-family:'Orbitron',sans-serif;font-size:.5rem;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.sm-row{margin-bottom:7px}
+.sm-label{display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted);margin-bottom:3px}
+.sm-label span:last-child{color:var(--text)}
+.sm-bar{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.sm-fill{height:100%;border-radius:2px;transition:width .8s ease}
+.fill-cyan{background:linear-gradient(90deg,var(--cyan),rgba(0,229,255,.5));box-shadow:0 0 6px var(--cyan)}
+.fill-purple{background:linear-gradient(90deg,var(--purple),rgba(124,58,237,.5));box-shadow:0 0 6px var(--purple)}
+.fill-amber{background:linear-gradient(90deg,var(--amber),rgba(255,193,7,.5));box-shadow:0 0 6px var(--amber)}
 
-    /* ===================== SCANLINES ===================== */
-    #scanlines {
-      position: fixed; inset: 0; z-index: 1;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.12) 2px,
-        rgba(0,0,0,0.12) 4px
-      );
-    }
+/* Session info */
+#session-box{padding:10px 14px;border-top:1px solid rgba(0,229,255,.08)}
+.sess-row{display:flex;justify-content:space-between;font-size:.6rem;padding:3px 0}
+.sess-key{color:var(--muted)}
+.sess-val{font-family:'Share Tech Mono',monospace;color:var(--text)}
+#end-btn{margin-top:10px;width:100%;padding:8px;border:1px solid rgba(255,23,68,.4);background:rgba(255,23,68,.07);color:var(--red);font-family:'Orbitron',sans-serif;font-size:.55rem;letter-spacing:.2em;border-radius:4px;cursor:pointer;transition:all .3s}
+#end-btn:hover{background:rgba(255,23,68,.2);box-shadow:0 0 14px rgba(255,23,68,.3)}
 
-    /* ===================== CORNER BRACKETS ===================== */
-    .corner {
-      position: fixed; z-index: 5;
-      width: 40px; height: 40px;
-      pointer-events: none;
-    }
-    .corner::before, .corner::after {
-      content: '';
-      position: absolute;
-      background: var(--cyan);
-      box-shadow: 0 0 8px var(--cyan);
-    }
-    .corner::before { width: 100%; height: 2px; }
-    .corner::after  { width: 2px; height: 100%; }
-    .corner-tl { top: 14px; left: 14px; }
-    .corner-tl::before { top: 0; left: 0; }
-    .corner-tl::after  { top: 0; left: 0; }
+/* CENTER */
+#center-col{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:6px;min-width:0}
+#cam-wrap{flex:1;position:relative;background:#000;border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 0 40px rgba(0,229,255,.08),inset 0 0 60px rgba(0,0,0,.6)}
+#cam-wrap::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,229,255,.05) 0%,transparent 20%,transparent 80%,rgba(0,229,255,.05) 100%),linear-gradient(90deg,rgba(0,229,255,.04) 0%,transparent 10%,transparent 90%,rgba(0,229,255,.04) 100%);pointer-events:none;z-index:20;border-radius:8px}
+#input_video{display:none}
+#output_canvas{position:absolute;inset:0;width:100%;height:100%;display:none;z-index:15;border-radius:8px}
+#cam-placeholder{position:absolute;inset:0;z-index:16;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#cam-placeholder i{font-size:3.5rem;color:rgba(0,229,255,.2);animation:float 3s ease infinite alternate}
+@keyframes float{from{transform:translateY(0);opacity:.25}to{transform:translateY(-10px);opacity:.5}}
+#cam-placeholder p{font-family:'Orbitron',sans-serif;font-size:.55rem;letter-spacing:.3em;color:rgba(0,229,255,.35);text-transform:uppercase}
+#cam-loading{position:absolute;inset:0;z-index:30;background:rgba(6,8,15,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;border-radius:8px}
+.tri-ring{width:52px;height:52px;position:relative}
+.tri-ring::before,.tri-ring::after{content:'';position:absolute;border-radius:50%;border:2px solid transparent}
+.tri-ring::before{inset:0;border-top-color:var(--cyan);border-right-color:var(--purple);animation:spinA 1s linear infinite}
+.tri-ring::after{inset:8px;border-bottom-color:var(--pink);animation:spinA .7s linear infinite reverse}
+@keyframes spinA{to{transform:rotate(360deg)}}
+#cam-loading p{font-family:'Orbitron',sans-serif;font-size:.55rem;letter-spacing:.3em;color:var(--cyan);opacity:.8}
+#live-badge{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:22;display:flex;align-items:center;gap:7px;padding:4px 14px;border-radius:40px;font-family:'Orbitron',sans-serif;font-size:.55rem;font-weight:700;letter-spacing:.2em;transition:all .4s}
+#live-badge.standby{border:1px solid rgba(255,193,7,.3);background:rgba(255,193,7,.07);color:var(--amber)}
+#live-badge.live{border:1px solid rgba(224,64,251,.4);background:rgba(224,64,251,.1);color:var(--pink);text-shadow:0 0 10px var(--pink)}
 
-    .corner-tr { top: 14px; right: 14px; }
-    .corner-tr::before { top: 0; right: 0; left: auto; }
-    .corner-tr::after  { top: 0; right: 0; left: auto; }
+/* Corner brackets on cam */
+.cam-corner{position:absolute;width:20px;height:20px;z-index:21;pointer-events:none}
+.cam-corner::before,.cam-corner::after{content:'';position:absolute;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.cam-corner::before{width:100%;height:1.5px}.cam-corner::after{width:1.5px;height:100%}
+.cc-tl{top:10px;left:10px}.cc-tr{top:10px;right:10px}.cc-bl{bottom:10px;left:10px}.cc-br{bottom:10px;right:10px}
+.cc-tr::before,.cc-br::before{right:0;left:auto}
+.cc-tr::after,.cc-br::after{right:0;left:auto}
+.cc-bl::before,.cc-br::before{top:auto;bottom:0}
+.cc-bl::after,.cc-br::after{top:auto;bottom:0}
 
-    .corner-bl { bottom: 14px; left: 14px; }
-    .corner-bl::before { bottom: 0; top: auto; left: 0; }
-    .corner-bl::after  { bottom: 0; top: auto; left: 0; }
+/* Cam toolbar */
+#cam-toolbar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);z-index:22;display:flex;gap:8px}
+.cam-tbtn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(0,229,255,.25);background:rgba(6,8,15,.7);color:var(--cyan);font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;backdrop-filter:blur(8px)}
+.cam-tbtn:hover{border-color:var(--cyan);background:rgba(0,229,255,.15);box-shadow:0 0 14px rgba(0,229,255,.3)}
+.cam-tbtn.active{background:rgba(0,229,255,.2);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.4)}
 
-    .corner-br { bottom: 14px; right: 14px; }
-    .corner-br::before { bottom: 0; top: auto; right: 0; left: auto; }
-    .corner-br::after  { bottom: 0; top: auto; right: 0; left: auto; }
+/* Cam bottom row */
+#cam-ctrls{display:flex;gap:6px}
+.cam-btn{flex:1;padding:9px;border-radius:5px;font-family:'Orbitron',sans-serif;font-size:.58rem;font-weight:700;letter-spacing:.18em;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:7px}
+.cam-btn.start{border:1px solid rgba(0,229,255,.35);background:rgba(0,229,255,.07);color:var(--cyan)}
+.cam-btn.start:hover{background:rgba(0,229,255,.18);box-shadow:0 0 18px rgba(0,229,255,.25)}
+.cam-btn.stop{border:1px solid rgba(255,23,68,.3);background:rgba(255,23,68,.06);color:var(--red)}
+.cam-btn.stop:hover{background:rgba(255,23,68,.18);box-shadow:0 0 18px rgba(255,23,68,.25)}
 
-    /* ===================== MAIN LAYOUT ===================== */
-    #app {
-      position: fixed; inset: 0; z-index: 10;
-      display: grid;
-      grid-template-columns: 280px 1fr 280px;
-      grid-template-rows: 60px 1fr 120px;
-      gap: 10px;
-      padding: 14px;
-      opacity: 0;
-    }
+/* RIGHT COLUMN */
+#right-col{grid-column:3;grid-row:2;display:flex;flex-direction:column;gap:6px;min-width:0}
 
-    /* ===================== HEADER ===================== */
-    #header {
-      grid-column: 1 / -1;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px;
-      border: 1px solid var(--border);
-      background: linear-gradient(90deg, rgba(0,245,255,0.06), rgba(180,77,255,0.06));
-      backdrop-filter: blur(12px);
-      border-radius: 6px;
-      position: relative; overflow: hidden;
-    }
-    #header::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(90deg, transparent, rgba(0,245,255,0.04), transparent);
-      animation: headerSweep 4s linear infinite;
-    }
-    @keyframes headerSweep {
-      from { transform: translateX(-100%); }
-      to   { transform: translateX(100%); }
-    }
-    #header-logo {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.1rem; font-weight: 900;
-      color: var(--cyan);
-      letter-spacing: 0.22em;
-      text-shadow: 0 0 20px var(--cyan);
-    }
-    #header-logo span { color: var(--purple); text-shadow: 0 0 20px var(--purple); }
-    #header-center {
-      display: flex; align-items: center; gap: 30px;
-      font-size: 0.65rem; letter-spacing: 0.22em; color: var(--muted);
-      text-transform: uppercase;
-    }
-    #header-center .sep { color: var(--border); }
-    #header-right {
-      display: flex; align-items: center; gap: 18px;
-    }
-    .status-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 10px var(--green);
-      animation: dotBlink 1.4s ease infinite alternate;
-      display: inline-block; margin-right: 5px;
-    }
-    @keyframes dotBlink {
-      from { opacity: 0.5; box-shadow: 0 0 5px var(--green); }
-      to   { opacity: 1; box-shadow: 0 0 14px var(--green), 0 0 28px var(--green); }
-    }
-    #sys-clock {
-      font-size: 0.8rem; color: var(--cyan);
-      letter-spacing: 0.15em;
-    }
+/* PANELS */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;position:relative;overflow:hidden;backdrop-filter:blur(14px)}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.5}
+.p-title{font-family:'Orbitron',sans-serif;font-size:.55rem;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.p-title .p-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.p-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,229,255,.2),transparent);margin-left:6px}
 
-    /* ===================== PANEL BASE ===================== */
-    .panel {
-      border: 1px solid var(--border);
-      background: rgba(2,10,20,0.75);
-      backdrop-filter: blur(18px);
-      border-radius: 8px;
-      padding: 14px;
-      position: relative;
-      overflow: hidden;
-    }
-    .panel::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-      opacity: 0.6;
-    }
-    .panel-title {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.6rem; font-weight: 700;
-      letter-spacing: 0.3em; text-transform: uppercase;
-      color: var(--cyan); opacity: 0.8;
-      margin-bottom: 12px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .panel-title::after {
-      content: '';
-      flex: 1; height: 1px;
-      background: linear-gradient(90deg, var(--border), transparent);
-    }
+/* Gesture recognition panel */
+#gest-panel{flex:0 0 auto}
+#gest-main{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid rgba(124,58,237,.25);border-radius:6px;background:rgba(124,58,237,.07);margin-bottom:10px}
+#gest-icon{width:42px;height:42px;border-radius:50%;border:1px solid rgba(124,58,237,.4);display:flex;align-items:center;justify-content:center;font-size:1.3rem;background:rgba(124,58,237,.12);flex-shrink:0}
+#gest-name{font-family:'Orbitron',sans-serif;font-size:.9rem;font-weight:700;color:#fff;text-shadow:0 0 12px rgba(124,58,237,.7);transition:all .3s}
+#gest-conf{font-size:.6rem;color:var(--muted);margin-top:2px}
+#gest-conf span{color:var(--green)}
+.gh-title{font-size:.5rem;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;margin-bottom:7px;display:flex;justify-content:space-between}
+.gh-title a{color:var(--cyan);cursor:pointer;font-size:.48rem}
+.gh-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,229,255,.05);font-size:.6rem}
+.gh-row:last-child{border:none}
+.gh-gest{color:var(--text);display:flex;align-items:center;gap:6px}
+.gh-gest i{color:var(--purple);font-size:.6rem;width:12px}
+.gh-time{color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:.55rem}
 
-    /* ===================== LEFT PANEL ===================== */
-    #panel-left {
-      grid-column: 1;
-      grid-row: 2;
-      display: flex; flex-direction: column; gap: 10px;
-    }
+/* 3D Hand Model */
+#hand3d-panel{flex:0 0 auto}
+.h3d-tabs{display:flex;gap:6px;margin-bottom:8px}
+.h3d-tab{flex:1;padding:5px;border:1px solid var(--border);border-radius:4px;font-family:'Orbitron',sans-serif;font-size:.5rem;letter-spacing:.15em;text-align:center;cursor:pointer;transition:all .25s;color:var(--muted)}
+.h3d-tab.active{border-color:var(--cyan);background:rgba(0,229,255,.1);color:var(--cyan)}
+#hand3d-canvas-wrap{position:relative;height:110px;border:1px solid rgba(0,229,255,.1);border-radius:6px;background:rgba(0,0,0,.4);overflow:hidden;display:flex;align-items:center;justify-content:center}
+#hand3d-canvas{width:100%;height:100%}
+.h3d-hint{position:absolute;bottom:6px;right:8px;font-size:.5rem;color:var(--muted);letter-spacing:.1em}
 
-    /* Gesture display */
-    #gesture-box {
-      flex: 0 0 auto;
-    }
-    #gesture-label {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.05rem; font-weight: 700;
-      color: var(--cyan);
-      text-shadow: var(--glow-c);
-      text-align: center;
-      padding: 14px 8px;
-      border: 1px solid rgba(0,245,255,0.25);
-      border-radius: 6px;
-      background: rgba(0,245,255,0.05);
-      letter-spacing: 0.1em;
-      min-height: 60px;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s ease;
-      word-break: break-word;
-    }
+/* Gesture tips */
+#gtips-panel{flex:1;overflow:hidden}
+.gtip-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,229,255,.05);font-size:.6rem}
+.gtip-row:last-child{border:none}
+.gtip-icon{width:22px;height:22px;border-radius:50%;border:1px solid rgba(0,229,255,.2);display:flex;align-items:center;justify-content:center;font-size:.6rem;flex-shrink:0;color:var(--cyan)}
+.gtip-label{color:var(--muted)}
+.gtip-action{color:var(--text);margin-left:auto;font-size:.55rem}
 
-    /* Confidence meter */
-    #conf-box { flex: 0 0 auto; }
-    .meter-row {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em;
-      margin-bottom: 5px;
-    }
-    .meter-row span:last-child { color: var(--cyan); font-weight: 700; }
-    .bar-track {
-      width: 100%; height: 4px;
-      background: rgba(0,245,255,0.1);
-      border-radius: 2px; margin-bottom: 10px; overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%; width: 0%;
-      border-radius: 2px;
-      transition: width 0.3s ease;
-    }
-    .bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #0099aa); box-shadow: 0 0 8px var(--cyan); }
-    .bar-fill.purple { background: linear-gradient(90deg, var(--purple), #7700cc); box-shadow: 0 0 8px var(--purple); }
-    .bar-fill.green { background: linear-gradient(90deg, var(--green), #008844); box-shadow: 0 0 8px var(--green); }
-    .bar-fill.pink { background: linear-gradient(90deg, var(--pink), #aa0044); box-shadow: 0 0 8px var(--pink); }
+/* BOTTOM ROW */
+#bottom-row{grid-column:2/-1;grid-row:3;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;min-width:0}
 
-    /* Coordinates */
-    #coords-box { flex: 0 0 auto; }
-    .coord-row {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.68rem; color: var(--muted);
-      padding: 4px 0;
-      border-bottom: 1px solid rgba(0,245,255,0.06);
-    }
-    .coord-row:last-child { border-bottom: none; }
-    .coord-val { color: var(--cyan); font-family: 'Share Tech Mono', monospace; }
+/* Landmarks 3D */
+#lm3d-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;position:relative;overflow:hidden}
+#lm3d-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.5}
+#lm3d-canvas{width:100%;height:calc(100% - 38px);display:block;border-radius:4px}
+#lm3d-reset{position:absolute;bottom:10px;right:10px;padding:4px 10px;border:1px solid var(--border);background:rgba(0,229,255,.06);color:var(--cyan);font-family:'Orbitron',sans-serif;font-size:.48rem;letter-spacing:.15em;cursor:pointer;border-radius:3px;transition:all .25s}
+#lm3d-reset:hover{background:rgba(0,229,255,.15)}
 
-    /* Mini spark graph */
-    #motion-box { flex: 1 1 auto; min-height: 0; }
-    #spark-canvas {
-      width: 100%; height: 80px;
-      display: block;
-      border: 1px solid rgba(0,245,255,0.1);
-      border-radius: 4px;
-      background: rgba(0,245,255,0.02);
-    }
+/* Motion Analytics */
+#motion-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;position:relative;overflow:hidden}
+#motion-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.5}
+.ma-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.ma-stat{background:rgba(0,0,0,.3);border-radius:4px;padding:6px 8px}
+.ma-stat-label{font-size:.48rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase}
+.ma-stat-val{font-family:'Orbitron',sans-serif;font-size:.9rem;font-weight:700;color:var(--cyan);line-height:1.2}
+.ma-stat-sub{font-size:.5rem;color:var(--muted)}
+#wave-canvas{width:100%;height:52px;display:block;border:1px solid rgba(0,229,255,.08);border-radius:3px;background:rgba(0,0,0,.3)}
 
-    /* ===================== CENTER (Camera) ===================== */
-    #panel-center {
-      grid-column: 2;
-      grid-row: 2;
-      display: flex; flex-direction: column; gap: 8px;
-      padding: 0;
-      background: transparent;
-      border: none;
-      border-radius: 0;
-      backdrop-filter: none;
-    }
-    #panel-center::before { display: none; }
+/* Coordinates */
+#coords-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;position:relative;overflow:hidden}
+#coords-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:.5}
+.coords-group{margin-bottom:8px}
+.cg-label{font-size:.5rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.coord-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,229,255,.05)}
+.coord-row:last-child{border:none}
+.coord-axis{font-size:.58rem;color:var(--muted)}
+.coord-bar-wrap{flex:1;height:3px;background:rgba(0,229,255,.08);border-radius:2px;margin:0 8px;overflow:hidden}
+.coord-bar{height:100%;border-radius:2px;transition:width .2s ease}
+.axis-x .coord-bar{background:var(--red);box-shadow:0 0 4px var(--red)}
+.axis-y .coord-bar{background:var(--green);box-shadow:0 0 4px var(--green)}
+.axis-z .coord-bar{background:var(--cyan);box-shadow:0 0 4px var(--cyan)}
+.coord-val{font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--text);width:52px;text-align:right}
 
-    #cam-frame {
-      flex: 1 1 auto;
-      position: relative;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #000;
-      overflow: hidden;
-      box-shadow: 0 0 40px rgba(0,245,255,0.12), inset 0 0 80px rgba(0,0,0,0.8);
-    }
-    /* Holographic overlay */
-    #cam-frame::after {
-      content: '';
-      position: absolute; inset: 0;
-      background:
-        linear-gradient(180deg, rgba(0,245,255,0.06) 0%, transparent 30%, transparent 70%, rgba(0,245,255,0.06) 100%),
-        linear-gradient(90deg, rgba(0,245,255,0.04) 0%, transparent 15%, transparent 85%, rgba(0,245,255,0.04) 100%);
-      pointer-events: none; z-index: 20;
-      border-radius: 8px;
-    }
+/* Neural Network bottom */
+#neural-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;position:relative;overflow:hidden}
+#neural-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.5}
+#neural-canvas{width:100%;height:calc(100% - 28px);display:block;border-radius:4px;background:rgba(0,0,0,.3)}
 
-    #input_video { display: none; }
+/* Scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--cyan);border-radius:2px}
 
-    #output_canvas {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      display: none; z-index: 15;
-      border-radius: 8px;
-    }
+/* Particle overlay */
+#ptcl-canvas{position:fixed;inset:0;z-index:3;pointer-events:none}
 
-    /* Targeting reticle */
-    #reticle {
-      position: absolute;
-      width: 120px; height: 120px;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      z-index: 18; pointer-events: none;
-    }
-    #reticle::before, #reticle::after {
-      content: '';
-      position: absolute;
-      border: 1px solid rgba(0,245,255,0.3);
-      border-radius: 50%;
-    }
-    #reticle::before { inset: 0; animation: reticlePulse 2s ease infinite; }
-    #reticle::after  { inset: 20px; animation: reticlePulse 2s ease infinite 0.5s; }
-    @keyframes reticlePulse {
-      0%,100% { opacity: 0.3; transform: scale(1); }
-      50%      { opacity: 0.8; transform: scale(1.05); }
-    }
+/* Energy burst */
+.energy-burst{position:fixed;z-index:50;pointer-events:none;border-radius:50%;animation:burst .5s ease-out forwards}
+@keyframes burst{0%{transform:translate(-50%,-50%) scale(0);opacity:1}100%{transform:translate(-50%,-50%) scale(3);opacity:0}}
 
-    /* Live / Standby badge */
-    #cam-badge {
-      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 22;
-      display: flex; align-items: center; gap: 7px;
-      padding: 5px 14px;
-      border-radius: 40px;
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.6rem; letter-spacing: 0.25em;
-      font-weight: 700;
-      transition: all 0.4s ease;
-    }
-    #cam-badge.standby {
-      border: 1px solid rgba(255,200,0,0.35);
-      background: rgba(255,200,0,0.08);
-      color: #ffc800;
-    }
-    #cam-badge.live {
-      border: 1px solid rgba(255,45,120,0.5);
-      background: rgba(255,45,120,0.12);
-      color: var(--pink);
-      text-shadow: 0 0 12px var(--pink);
-    }
-
-    /* Cam controls */
-    #cam-controls {
-      display: flex; gap: 10px; justify-content: center;
-    }
-    .ctrl-btn {
-      flex: 1; max-width: 180px;
-      padding: 12px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: var(--dim);
-      color: var(--cyan);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.62rem; font-weight: 700;
-      letter-spacing: 0.2em; text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-    }
-    .ctrl-btn:hover {
-      background: rgba(0,245,255,0.18);
-      box-shadow: var(--glow-c);
-      transform: translateY(-1px);
-    }
-    .ctrl-btn.red {
-      border-color: rgba(255,45,120,0.4);
-      color: var(--pink);
-      background: rgba(255,45,120,0.06);
-    }
-    .ctrl-btn.red:hover {
-      background: rgba(255,45,120,0.2);
-      box-shadow: 0 0 20px rgba(255,45,120,0.5);
-    }
-
-    /* Placeholder */
-    #placeholder {
-      position: absolute; inset: 0; z-index: 16;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 18px;
-    }
-    #placeholder-icon {
-      font-size: 4rem;
-      color: rgba(0,245,255,0.25);
-      animation: floatIcon 3s ease infinite alternate;
-    }
-    @keyframes floatIcon {
-      from { transform: translateY(0px); opacity: 0.3; }
-      to   { transform: translateY(-12px); opacity: 0.6; }
-    }
-    #placeholder p {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.6rem; letter-spacing: 0.35em;
-      color: rgba(0,245,255,0.4); text-transform: uppercase;
-    }
-
-    /* Loading cam overlay */
-    #cam-loading {
-      position: absolute; inset: 0; z-index: 30;
-      background: rgba(2,5,9,0.92);
-      display: none;
-      flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-      border-radius: 8px;
-    }
-    .ring-loader {
-      width: 56px; height: 56px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      border-top-color: var(--cyan);
-      border-right-color: var(--purple);
-      animation: ringSpinA 1s linear infinite;
-      position: relative;
-    }
-    .ring-loader::after {
-      content: '';
-      position: absolute; inset: 6px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      border-bottom-color: var(--pink);
-      animation: ringSpinB 0.7s linear infinite reverse;
-    }
-    @keyframes ringSpinA { to { transform: rotate(360deg); } }
-    @keyframes ringSpinB { to { transform: rotate(360deg); } }
-    #cam-loading p {
-      font-size: 0.6rem; letter-spacing: 0.35em;
-      color: var(--cyan); opacity: 0.8;
-    }
-
-    /* ===================== RIGHT PANEL ===================== */
-    #panel-right {
-      grid-column: 3;
-      grid-row: 2;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-
-    /* System status */
-    #status-box { flex: 0 0 auto; }
-    .status-item {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 0.65rem; letter-spacing: 0.1em;
-      color: var(--muted);
-      padding: 5px 0;
-      border-bottom: 1px solid rgba(0,245,255,0.06);
-    }
-    .status-item:last-child { border-bottom: none; }
-    .status-val {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.65rem; font-weight: 700;
-    }
-    .val-green { color: var(--green); text-shadow: 0 0 8px var(--green); }
-    .val-cyan  { color: var(--cyan);  text-shadow: 0 0 8px var(--cyan); }
-    .val-purple{ color: var(--purple);text-shadow: 0 0 8px var(--purple); }
-    .val-pink  { color: var(--pink);  text-shadow: 0 0 8px var(--pink); }
-    .val-warn  { color: #ffc800;      text-shadow: 0 0 8px #ffc800; }
-
-    /* Neural network mini viz */
-    #neural-box { flex: 1 1 auto; min-height: 0; }
-    #neural-canvas {
-      width: 100%; height: 130px;
-      display: block;
-      border: 1px solid rgba(180,77,255,0.15);
-      border-radius: 4px;
-      background: rgba(0,0,0,0.4);
-    }
-
-    /* Hand info */
-    #hand-box { flex: 0 0 auto; }
-    #fingers-display {
-      display: flex; gap: 6px; justify-content: center;
-      margin-top: 6px;
-    }
-    .finger-node {
-      width: 28px; height: 28px; border-radius: 50%;
-      border: 1.5px solid rgba(0,245,255,0.25);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.5rem; color: var(--muted);
-      transition: all 0.2s ease;
-    }
-    .finger-node.up {
-      border-color: var(--cyan);
-      background: rgba(0,245,255,0.15);
-      color: var(--cyan);
-      box-shadow: 0 0 12px rgba(0,245,255,0.5);
-    }
-
-    /* Virtual buttons */
-    #vbuttons-box { flex: 0 0 auto; }
-    #vbtn-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-    .vbtn {
-      padding: 8px 6px;
-      border: 1px solid rgba(180,77,255,0.25);
-      border-radius: 4px;
-      background: var(--dim2);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.5rem; letter-spacing: 0.15em;
-      color: var(--purple); text-align: center;
-      cursor: default; transition: all 0.25s ease;
-    }
-    .vbtn.triggered {
-      border-color: var(--purple);
-      background: rgba(180,77,255,0.25);
-      box-shadow: 0 0 15px rgba(180,77,255,0.5);
-      color: #fff;
-    }
-
-    /* ===================== BOTTOM BAR ===================== */
-    #footer-bar {
-      grid-column: 1 / -1;
-      display: grid; grid-template-columns: repeat(6,1fr);
-      gap: 8px;
-    }
-    .metric-card {
-      border: 1px solid var(--border);
-      background: rgba(2,10,20,0.8);
-      backdrop-filter: blur(12px);
-      border-radius: 6px;
-      padding: 10px 14px;
-      display: flex; flex-direction: column;
-      gap: 4px; position: relative; overflow: hidden;
-    }
-    .metric-card::after {
-      content: '';
-      position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
-      border-radius: 0 0 6px 6px;
-    }
-    .metric-card.c-cyan::after  { background: var(--cyan);   box-shadow: 0 0 8px var(--cyan); }
-    .metric-card.c-purple::after{ background: var(--purple); box-shadow: 0 0 8px var(--purple); }
-    .metric-card.c-green::after { background: var(--green);  box-shadow: 0 0 8px var(--green); }
-    .metric-card.c-pink::after  { background: var(--pink);   box-shadow: 0 0 8px var(--pink); }
-
-    .metric-label {
-      font-size: 0.55rem; letter-spacing: 0.2em; text-transform: uppercase;
-      color: var(--muted);
-    }
-    .metric-val {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.3rem; font-weight: 700;
-      color: var(--cyan); line-height: 1;
-    }
-    .metric-card.c-purple .metric-val { color: var(--purple); }
-    .metric-card.c-green  .metric-val { color: var(--green); }
-    .metric-card.c-pink   .metric-val { color: var(--pink); }
-    .metric-sub { font-size: 0.6rem; color: var(--muted); }
-
-    /* ===================== HOLOGRAPHIC RING ===================== */
-    #holo-ring {
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      z-index: 2; pointer-events: none;
-      width: min(80vw, 80vh);
-      height: min(80vw, 80vh);
-      opacity: 0.06;
-    }
-    #holo-ring canvas { width: 100%; height: 100%; }
-
-    /* ===================== PARTICLE CANVAS ===================== */
-    #particle-canvas {
-      position: fixed; inset: 0; z-index: 3;
-      pointer-events: none;
-    }
-
-    /* ===================== THREE.JS HUD OBJECT ===================== */
-    #three-hud {
-      position: fixed; z-index: 4; pointer-events: none;
-      bottom: 130px; right: 300px;
-      width: 160px; height: 160px;
-    }
-
-    /* ===================== FADE TRANSITION ===================== */
-    .fade-in { animation: fadeIn 0.6s ease forwards; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* ===================== SCROLLBAR ===================== */
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
-  </style>
+/* Responsive font floor */
+@media(max-height:700px){#shell{font-size:11px}}
+</style>
 </head>
 <body>
 
-<!-- Hidden video input -->
-<video id="input_video" playsinline style="display:none;"></video>
+<video id="input_video" playsinline style="display:none"></video>
 
-<!-- ===== BOOT SCREEN ===== -->
-<div id="boot-screen">
-  <div id="boot-logo">NEURAL HAND</div>
-  <div id="boot-sub">AI Hand Tracking Interface — v3.0</div>
-  <div id="boot-bar-wrap"><div id="boot-bar"></div></div>
-  <div id="boot-status">INITIALIZING CORE MODULES...</div>
+<!-- BOOT -->
+<div id="boot">
+  <div id="boot-logo">NEURAL<span style="color:var(--purple)">HAND</span></div>
+  <div id="boot-ver">AI INTERFACE &nbsp;v2.0.0 &nbsp;—&nbsp; 2026 NEURAL SYSTEMS</div>
+  <div id="boot-track"><div id="boot-fill"></div></div>
+  <div id="boot-msg">INITIALIZING...</div>
 </div>
 
-<!-- ===== BACKGROUND ===== -->
+<!-- BG -->
 <canvas id="bg-canvas"></canvas>
-<div id="scanlines"></div>
-<canvas id="particle-canvas"></canvas>
+<div id="scan"></div>
+<canvas id="ptcl-canvas"></canvas>
 
-<!-- ===== HOLOGRAPHIC RING ===== -->
-<div id="holo-ring"><canvas id="holo-canvas"></canvas></div>
+<!-- SHELL -->
+<div id="shell">
 
-<!-- ===== CORNERS ===== -->
-<div class="corner corner-tl"></div>
-<div class="corner corner-tr"></div>
-<div class="corner corner-bl"></div>
-<div class="corner corner-br"></div>
-
-<!-- ===== FLOATING 3D HUD ===== -->
-<canvas id="three-hud"></canvas>
-
-<!-- ===== MAIN APP ===== -->
-<div id="app">
-
-  <!-- HEADER -->
-  <header id="header">
-    <div id="header-logo">NEURAL<span>HAND</span></div>
-    <div id="header-center">
-      <span><span class="status-dot"></span>SYSTEM ONLINE</span>
-      <span class="sep">|</span>
-      <span>MEDIAPIPE ACTIVE</span>
-      <span class="sep">|</span>
-      <span id="header-mode">MODE: STANDBY</span>
+  <!-- TOP BAR -->
+  <header id="topbar">
+    <div class="tb-logo">NEURAL<span>HAND</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">System Status</div>
+      <div class="tb-val online"><span class="status-dot"></span>ONLINE</div>
     </div>
-    <div id="header-right">
-      <span id="sys-clock">--:--:--</span>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">Tracking Mode</div>
+      <div class="tb-val cyan" id="tb-mode">PRECISE</div>
     </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">Camera</div>
+      <div class="tb-val cyan">HD WEBCAM</div>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">Resolution</div>
+      <div class="tb-val cyan">1280 × 720</div>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">FPS</div>
+      <div class="tb-val cyan" id="tb-fps">—</div>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <div class="tb-label">Latency</div>
+      <div class="tb-val amber" id="tb-lat">—</div>
+    </div>
+    <div id="tb-clock">--:--:--</div>
   </header>
 
-  <!-- LEFT PANEL -->
-  <aside id="panel-left">
-
-    <div class="panel" id="gesture-box">
-      <div class="panel-title"><i class="fa-solid fa-hand"></i> GESTURE</div>
-      <div id="gesture-label">SYSTEM STANDBY</div>
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <nav class="sb-nav">
+      <div class="sb-item active"><i class="fa-solid fa-gauge"></i>Dashboard</div>
+      <div class="sb-item"><i class="fa-solid fa-hand-sparkles"></i>Live Tracking</div>
+      <div class="sb-item"><i class="fa-solid fa-cube"></i>3D Visualizer</div>
+      <div class="sb-item"><i class="fa-solid fa-hand"></i>Gestures</div>
+      <div class="sb-item"><i class="fa-solid fa-chart-line"></i>Analytics</div>
+      <div class="sb-item"><i class="fa-solid fa-gear"></i>Settings</div>
+    </nav>
+    <div class="sb-divider"></div>
+    <div id="track-overview">
+      <div class="ov-title">Tracking Overview</div>
+      <div class="ov-ring-wrap">
+        <canvas id="acc-ring" width="90" height="90"></canvas>
+      </div>
+      <div class="ov-row"><span class="ov-key">Stability</span><span class="ov-val good" id="ov-stab">Excellent</span></div>
+      <div class="ov-row"><span class="ov-key">Confidence</span><span class="ov-val amber" id="ov-conf">—</span></div>
+      <div class="ov-row"><span class="ov-key">Hands Detected</span><span class="ov-val cyan" id="ov-hands">0</span></div>
+      <div class="ov-row"><span class="ov-key">Landmarks</span><span class="ov-val cyan" id="ov-lm">0 / 21</span></div>
+      <div class="ov-row"><span class="ov-key">Tracking Quality</span><span class="ov-val good" id="ov-qual">—</span></div>
     </div>
-
-    <div class="panel" id="conf-box">
-      <div class="panel-title"><i class="fa-solid fa-chart-line"></i> METRICS</div>
-      <div class="meter-row"><span>CONFIDENCE</span><span id="conf-val">0%</span></div>
-      <div class="bar-track"><div class="bar-fill cyan" id="conf-bar"></div></div>
-      <div class="meter-row"><span>STABILITY</span><span id="stab-val">0%</span></div>
-      <div class="bar-track"><div class="bar-fill purple" id="stab-bar"></div></div>
-      <div class="meter-row"><span>DEPTH</span><span id="depth-val">0%</span></div>
-      <div class="bar-track"><div class="bar-fill green" id="depth-bar"></div></div>
-      <div class="meter-row"><span>VELOCITY</span><span id="vel-val">0 px/s</span></div>
-      <div class="bar-track"><div class="bar-fill pink" id="vel-bar"></div></div>
+    <div id="sys-metrics">
+      <div class="sm-title">System Metrics</div>
+      <div class="sm-row">
+        <div class="sm-label"><span>CPU Usage</span><span id="sm-cpu">—</span></div>
+        <div class="sm-bar"><div class="sm-fill fill-cyan" id="sm-cpu-bar" style="width:34%"></div></div>
+      </div>
+      <div class="sm-row">
+        <div class="sm-label"><span>Memory</span><span id="sm-mem">2.1 GB / 8 GB</span></div>
+        <div class="sm-bar"><div class="sm-fill fill-purple" id="sm-mem-bar" style="width:26%"></div></div>
+      </div>
+      <div class="sm-row">
+        <div class="sm-label"><span>GPU Usage</span><span id="sm-gpu">—</span></div>
+        <div class="sm-bar"><div class="sm-fill fill-amber" id="sm-gpu-bar" style="width:42%"></div></div>
+      </div>
+      <div class="sm-row" style="margin-top:6px">
+        <div class="sm-label" style="margin-bottom:0"><span>Temperature</span><span id="sm-temp">62°C</span></div>
+      </div>
     </div>
-
-    <div class="panel" id="coords-box">
-      <div class="panel-title"><i class="fa-solid fa-crosshairs"></i> COORDINATES</div>
-      <div class="coord-row"><span>WRIST X</span><span class="coord-val" id="cx">—</span></div>
-      <div class="coord-row"><span>WRIST Y</span><span class="coord-val" id="cy">—</span></div>
-      <div class="coord-row"><span>WRIST Z</span><span class="coord-val" id="cz">—</span></div>
-      <div class="coord-row"><span>SPREAD</span><span class="coord-val" id="csp">—</span></div>
+    <div id="session-box">
+      <div class="sm-title">Session Info</div>
+      <div class="sess-row"><span class="sess-key">Session Time</span><span class="sess-val" id="sess-time">00:00:00</span></div>
+      <div class="sess-row"><span class="sess-key">Total Gestures</span><span class="sess-val" id="sess-gest">0</span></div>
+      <div class="sess-row"><span class="sess-key">Avg FPS</span><span class="sess-val" id="sess-fps">—</span></div>
+      <div class="sess-row"><span class="sess-key">Max FPS</span><span class="sess-val" id="sess-mfps">—</span></div>
+      <button id="end-btn"><i class="fa-solid fa-square"></i> &nbsp;END SESSION</button>
     </div>
-
-    <div class="panel" id="motion-box">
-      <div class="panel-title"><i class="fa-solid fa-wave-square"></i> MOTION GRAPH</div>
-      <canvas id="spark-canvas"></canvas>
-    </div>
-
   </aside>
 
-  <!-- CENTER (Camera) -->
-  <main id="panel-center">
-    <div id="cam-frame">
-      <!-- Reticle -->
-      <div id="reticle"></div>
-
-      <!-- Badge -->
-      <div id="cam-badge" class="standby">
-        <span class="status-dot" style="background:#ffc800; box-shadow:0 0 8px #ffc800;"></span>
-        STANDBY
-      </div>
-
-      <!-- Outputs -->
+  <!-- CENTER COLUMN -->
+  <main id="center-col">
+    <div id="cam-wrap">
+      <!-- corners -->
+      <div class="cam-corner cc-tl"></div>
+      <div class="cam-corner cc-tr"></div>
+      <div class="cam-corner cc-bl"></div>
+      <div class="cam-corner cc-br"></div>
+      <!-- badge -->
+      <div id="live-badge" class="standby"><span class="status-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></span>STANDBY</div>
+      <!-- canvas -->
       <canvas id="output_canvas"></canvas>
-
-      <!-- Placeholder -->
-      <div id="placeholder">
-        <div id="placeholder-icon"><i class="fa-solid fa-hand-sparkles"></i></div>
+      <!-- placeholder -->
+      <div id="cam-placeholder">
+        <i class="fa-solid fa-hand-sparkles"></i>
         <p>AWAITING CAMERA INPUT</p>
-        <p style="font-size:0.5rem; opacity:0.5;">PRESS INITIATE TO BEGIN TRACKING</p>
+        <p style="font-size:.48rem;opacity:.5;letter-spacing:.2em">CLICK INITIATE TO BEGIN</p>
       </div>
-
-      <!-- Loading -->
-      <div id="cam-loading">
-        <div class="ring-loader"></div>
-        <p>CALIBRATING SENSORS...</p>
+      <!-- loading -->
+      <div id="cam-loading"><div class="tri-ring"></div><p>CALIBRATING SENSORS...</p></div>
+      <!-- toolbar -->
+      <div id="cam-toolbar">
+        <button class="cam-tbtn active" id="btn-track" title="Toggle Tracking"><i class="fa-solid fa-eye"></i></button>
+        <button class="cam-tbtn" id="btn-mesh" title="Toggle Mesh"><i class="fa-solid fa-triangle-exclamation"></i></button>
+        <button class="cam-tbtn" id="btn-neural" title="Toggle Neural"><i class="fa-solid fa-brain"></i></button>
+        <button class="cam-tbtn" id="btn-heatmap" title="Toggle Heatmap"><i class="fa-solid fa-fire"></i></button>
+        <button class="cam-tbtn" id="btn-3d" title="Toggle 3D"><i class="fa-solid fa-cube"></i></button>
       </div>
     </div>
-
-    <!-- Controls -->
-    <div id="cam-controls">
-      <button class="ctrl-btn" id="start-btn">
-        <i class="fa-solid fa-power-off"></i> INITIATE TRACKING
-      </button>
-      <button class="ctrl-btn red" id="stop-btn">
-        <i class="fa-solid fa-square"></i> TERMINATE
-      </button>
+    <div id="cam-ctrls">
+      <button class="cam-btn start" id="start-btn"><i class="fa-solid fa-power-off"></i> INITIATE TRACKING</button>
+      <button class="cam-btn stop" id="stop-btn"><i class="fa-solid fa-stop"></i> TERMINATE</button>
     </div>
   </main>
 
-  <!-- RIGHT PANEL -->
-  <aside id="panel-right">
+  <!-- RIGHT COLUMN -->
+  <aside id="right-col">
 
-    <div class="panel" id="status-box">
-      <div class="panel-title"><i class="fa-solid fa-microchip"></i> SYSTEM STATUS</div>
-      <div class="status-item"><span>ENGINE</span><span class="status-val val-green" id="st-engine">ONLINE</span></div>
-      <div class="status-item"><span>HANDS DETECTED</span><span class="status-val val-cyan" id="st-hands">0</span></div>
-      <div class="status-item"><span>FPS</span><span class="status-val val-purple" id="st-fps">—</span></div>
-      <div class="status-item"><span>LATENCY</span><span class="status-val val-cyan" id="st-lat">—</span></div>
-      <div class="status-item"><span>SESSION</span><span class="status-val val-green" id="st-time">00:00</span></div>
-      <div class="status-item"><span>FRAMES</span><span class="status-val val-cyan" id="st-frames">0</span></div>
+    <!-- Gesture Recognition -->
+    <div class="panel" id="gest-panel">
+      <div class="p-title"><div class="p-dot"></div>Gesture Recognition</div>
+      <div id="gest-main">
+        <div id="gest-icon">✋</div>
+        <div>
+          <div id="gest-name">OPEN PALM</div>
+          <div id="gest-conf">Confidence: <span id="gest-conf-val">95%</span></div>
+        </div>
+      </div>
+      <div class="gh-title"><span>Gesture History</span><a>View All</a></div>
+      <div id="gest-history"></div>
     </div>
 
-    <div class="panel" id="neural-box">
-      <div class="panel-title"><i class="fa-solid fa-brain"></i> NEURAL ACTIVITY</div>
-      <canvas id="neural-canvas"></canvas>
-    </div>
-
-    <div class="panel" id="hand-box">
-      <div class="panel-title"><i class="fa-solid fa-fingerprint"></i> FINGER STATE</div>
-      <div id="fingers-display">
-        <div class="finger-node" id="fn-0" title="Thumb">T</div>
-        <div class="finger-node" id="fn-1" title="Index">I</div>
-        <div class="finger-node" id="fn-2" title="Middle">M</div>
-        <div class="finger-node" id="fn-3" title="Ring">R</div>
-        <div class="finger-node" id="fn-4" title="Pinky">P</div>
+    <!-- 3D Hand Model -->
+    <div class="panel" id="hand3d-panel">
+      <div class="p-title"><div class="p-dot" style="background:var(--purple);box-shadow:0 0 8px var(--purple)"></div><span style="color:var(--purple)">3D Hand Model</span></div>
+      <div class="h3d-tabs">
+        <div class="h3d-tab active" id="tab-wire">WIREFRAME</div>
+        <div class="h3d-tab" id="tab-solid">SOLID</div>
+      </div>
+      <div id="hand3d-canvas-wrap">
+        <canvas id="hand3d-canvas"></canvas>
+        <div class="h3d-hint">LIVE</div>
       </div>
     </div>
 
-    <div class="panel" id="vbuttons-box">
-      <div class="panel-title"><i class="fa-solid fa-hand-pointer"></i> VIRTUAL TRIGGERS</div>
-      <div id="vbtn-grid">
-        <div class="vbtn" id="vbtn-0">CAPTURE</div>
-        <div class="vbtn" id="vbtn-1">ROTATE</div>
-        <div class="vbtn" id="vbtn-2">PINCH</div>
-        <div class="vbtn" id="vbtn-3">EXPAND</div>
-      </div>
+    <!-- Gesture Tips -->
+    <div class="panel" id="gtips-panel">
+      <div class="p-title" style="color:var(--muted);font-size:.5rem">GESTURE CONTROLS</div>
+      <div class="gtip-row"><div class="gtip-icon"><i class="fa-solid fa-hand-pinch"></i></div><span class="gtip-label">Pinch</span><span class="gtip-action">Grab &amp; Move</span></div>
+      <div class="gtip-row"><div class="gtip-icon"><i class="fa-solid fa-rotate"></i></div><span class="gtip-label">Rotate Hand</span><span class="gtip-action">Rotate Object</span></div>
+      <div class="gtip-row"><div class="gtip-icon"><i class="fa-solid fa-expand"></i></div><span class="gtip-label">Spread Fingers</span><span class="gtip-action">Swipe Switch</span></div>
     </div>
 
   </aside>
 
-  <!-- BOTTOM METRICS BAR -->
-  <div id="footer-bar">
-    <div class="metric-card c-cyan">
-      <div class="metric-label">Live FPS</div>
-      <div class="metric-val" id="m-fps">—</div>
-      <div class="metric-sub">Target: 60</div>
-    </div>
-    <div class="metric-card c-purple">
-      <div class="metric-label">Hands</div>
-      <div class="metric-val" id="m-hands">0</div>
-      <div class="metric-sub">Max: 2</div>
-    </div>
-    <div class="metric-card c-green">
-      <div class="metric-label">Confidence</div>
-      <div class="metric-val" id="m-conf">—</div>
-      <div class="metric-sub">Detection</div>
-    </div>
-    <div class="metric-card c-pink">
-      <div class="metric-label">Gesture</div>
-      <div class="metric-val" style="font-size:0.85rem;" id="m-gest">IDLE</div>
-      <div class="metric-sub">Active</div>
-    </div>
-    <div class="metric-card c-cyan">
-      <div class="metric-label">Depth</div>
-      <div class="metric-val" id="m-depth">—</div>
-      <div class="metric-sub">Estimation</div>
-    </div>
-    <div class="metric-card c-purple">
-      <div class="metric-label">Uptime</div>
-      <div class="metric-val" style="font-size:1rem;" id="m-uptime">00:00</div>
-      <div class="metric-sub">Session</div>
-    </div>
-  </div>
+  <!-- BOTTOM ROW -->
+  <div id="bottom-row">
 
-</div><!-- end #app -->
+    <!-- Landmarks 3D -->
+    <div class="panel" id="lm3d-panel">
+      <div class="p-title"><div class="p-dot"></div>Hand Landmarks 3D</div>
+      <canvas id="lm3d-canvas"></canvas>
+      <button id="lm3d-reset">RESET VIEW</button>
+    </div>
+
+    <!-- Motion Analytics -->
+    <div class="panel" id="motion-panel">
+      <div class="p-title" style="color:var(--purple)"><div class="p-dot" style="background:var(--purple);box-shadow:0 0 8px var(--purple)"></div>Motion Analytics</div>
+      <div class="ma-stats">
+        <div class="ma-stat">
+          <div class="ma-stat-label">Speed</div>
+          <div class="ma-stat-val" id="ma-speed">—</div>
+          <div class="ma-stat-sub">px/s</div>
+        </div>
+        <div class="ma-stat">
+          <div class="ma-stat-label">Stability</div>
+          <div class="ma-stat-val" id="ma-stab">—</div>
+          <div class="ma-stat-sub">score</div>
+        </div>
+        <div class="ma-stat" style="grid-column:1/-1">
+          <div class="ma-stat-label">Smoothness</div>
+          <div class="ma-stat-val" id="ma-smooth">—</div>
+          <div class="ma-stat-sub">score</div>
+        </div>
+      </div>
+      <canvas id="wave-canvas"></canvas>
+    </div>
+
+    <!-- Coordinates Live -->
+    <div class="panel" id="coords-panel">
+      <div class="p-title" style="color:var(--green)"><div class="p-dot" style="background:var(--green);box-shadow:0 0 8px var(--green)"></div>Coordinates (Live)</div>
+      <div class="coords-group">
+        <div class="cg-label">Wrist</div>
+        <div class="coord-row axis-x"><span class="coord-axis">X</span><div class="coord-bar-wrap"><div class="coord-bar" id="cx-bar" style="width:50%"></div></div><span class="coord-val" id="cx">—</span></div>
+        <div class="coord-row axis-y"><span class="coord-axis">Y</span><div class="coord-bar-wrap"><div class="coord-bar" id="cy-bar" style="width:50%"></div></div><span class="coord-val" id="cy">—</span></div>
+        <div class="coord-row axis-z"><span class="coord-axis">Z</span><div class="coord-bar-wrap"><div class="coord-bar" id="cz-bar" style="width:50%"></div></div><span class="coord-val" id="cz">—</span></div>
+      </div>
+      <div class="coords-group">
+        <div class="cg-label">Index Finger Tip</div>
+        <div class="coord-row axis-x"><span class="coord-axis">X</span><div class="coord-bar-wrap"><div class="coord-bar" id="ix-bar" style="width:50%"></div></div><span class="coord-val" id="ix">—</span></div>
+        <div class="coord-row axis-y"><span class="coord-axis">Y</span><div class="coord-bar-wrap"><div class="coord-bar" id="iy-bar" style="width:50%"></div></div><span class="coord-val" id="iy">—</span></div>
+        <div class="coord-row axis-z"><span class="coord-axis">Z</span><div class="coord-bar-wrap"><div class="coord-bar" id="iz-bar" style="width:50%"></div></div><span class="coord-val" id="iz">—</span></div>
+      </div>
+    </div>
+
+    <!-- Neural Network -->
+    <div class="panel" id="neural-panel">
+      <div class="p-title" style="color:var(--purple)"><div class="p-dot" style="background:var(--purple);box-shadow:0 0 8px var(--purple)"></div>Neural Network</div>
+      <canvas id="neural-canvas"></canvas>
+    </div>
+
+  </div>
+</div><!-- /shell -->
 
 <script>
-/* ============================================================
+/* ====================================================================
    BOOT SEQUENCE
-============================================================ */
-(function boot() {
-  const bar    = document.getElementById('boot-bar');
-  const status = document.getElementById('boot-status');
-  const screen = document.getElementById('boot-screen');
-  const app    = document.getElementById('app');
-
+==================================================================== */
+(function(){
+  const fill = document.getElementById('boot-fill');
+  const msg  = document.getElementById('boot-msg');
+  const boot = document.getElementById('boot');
+  const shell= document.getElementById('shell');
   const steps = [
-    [5,  "LOADING NEURAL MODULES..."],
-    [18, "CALIBRATING HAND MESH PROCESSOR..."],
-    [32, "INITIALIZING MEDIAPIPE SDK..."],
-    [50, "BUILDING PARTICLE ENGINE..."],
-    [65, "LOADING THREE.JS RENDERER..."],
-    [80, "ESTABLISHING CAMERA PIPELINE..."],
-    [94, "COMPILING GESTURE CLASSIFIER..."],
-    [100,"SYSTEM READY — NEURAL HAND ONLINE"]
+    [8,  'LOADING NEURAL ENGINE...'],
+    [22, 'INITIALIZING MEDIAPIPE SDK...'],
+    [38, 'BUILDING THREE.JS RENDERER...'],
+    [52, 'CALIBRATING DEPTH PROCESSOR...'],
+    [66, 'COMPILING SHADER PROGRAMS...'],
+    [80, 'ESTABLISHING CAMERA PIPELINE...'],
+    [93, 'LOADING GESTURE CLASSIFIER...'],
+    [100,'NEURAL HAND v2.0 — ONLINE']
   ];
-
-  let i = 0;
-  function nextStep() {
-    if (i >= steps.length) {
-      setTimeout(() => {
-        screen.style.transition = 'opacity 0.7s ease';
-        screen.style.opacity = '0';
-        app.style.opacity = '1';
-        app.classList.add('fade-in');
-        setTimeout(() => screen.style.display = 'none', 700);
-      }, 400);
-      return;
+  let i=0;
+  function step(){
+    if(i>=steps.length){
+      setTimeout(()=>{
+        boot.style.transition='opacity .7s'; boot.style.opacity=0;
+        shell.style.opacity=1;
+        setTimeout(()=>boot.style.display='none',700);
+      },400); return;
     }
-    const [pct, msg] = steps[i++];
-    bar.style.width = pct + '%';
-    status.textContent = msg;
-    setTimeout(nextStep, 260 + Math.random() * 200);
+    const [p,m]=steps[i++];
+    fill.style.width=p+'%'; msg.textContent=m;
+    setTimeout(step,240+Math.random()*180);
   }
-  setTimeout(nextStep, 300);
+  setTimeout(step,300);
 })();
 
-/* ============================================================
+/* ====================================================================
    CLOCK
-============================================================ */
-function updateClock() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  document.getElementById('sys-clock').textContent =
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+==================================================================== */
+function tick(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  document.getElementById('tb-clock').textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(tick,1000); tick();
 
-/* ============================================================
-   THREE.JS BACKGROUND — star field + nebula rings
-============================================================ */
-(function initBG() {
-  const canvas = document.getElementById('bg-canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(innerWidth, innerHeight);
-
-  const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2000);
-  cam.position.z = 500;
-
+/* ====================================================================
+   THREE.JS BACKGROUND
+==================================================================== */
+(function(){
+  const c=document.getElementById('bg-canvas');
+  const r=new THREE.WebGLRenderer({canvas:c,alpha:true,antialias:false});
+  r.setPixelRatio(Math.min(devicePixelRatio,2));
+  r.setSize(innerWidth,innerHeight);
+  const sc=new THREE.Scene(), cam=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,2000);
+  cam.position.z=500;
   // Stars
-  const starGeo = new THREE.BufferGeometry();
-  const N = 1200;
-  const pos = new Float32Array(N * 3);
-  for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * 2000;
-  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0x00f5ff, size: 1.4, transparent: true, opacity: 0.55 });
-  scene.add(new THREE.Points(starGeo, starMat));
-
-  // Dim purple ring
-  const ringGeo = new THREE.TorusGeometry(220, 0.8, 2, 120);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xb44dff, transparent: true, opacity: 0.12 });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = Math.PI / 3;
-  scene.add(ring);
-
-  const ringGeo2 = new THREE.TorusGeometry(340, 0.5, 2, 160);
-  const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.07 });
-  const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
-  ring2.rotation.x = Math.PI / 5;
-  ring2.rotation.y = 0.6;
-  scene.add(ring2);
-
-  let mX = 0, mY = 0;
-  window.addEventListener('mousemove', e => {
-    mX = (e.clientX / innerWidth  - 0.5) * 0.4;
-    mY = (e.clientY / innerHeight - 0.5) * 0.4;
-  });
-
-  (function animate(t) {
-    requestAnimationFrame(animate);
-    ring.rotation.z  = t * 0.00012;
-    ring2.rotation.z = t * -0.00008;
-    scene.rotation.y += (mX - scene.rotation.y) * 0.02;
-    scene.rotation.x += (mY - scene.rotation.x) * 0.02;
-    renderer.render(scene, cam);
-  })(0);
-
-  window.addEventListener('resize', () => {
-    cam.aspect = innerWidth / innerHeight;
-    cam.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  });
-})();
-
-/* ============================================================
-   THREE.JS FLOATING HUD CUBE
-============================================================ */
-(function initHUD() {
-  const canvas = document.getElementById('three-hud');
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(devicePixelRatio);
-  renderer.setSize(160, 160);
-
-  const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  cam.position.z = 4;
-
-  // Wireframe cube
-  const geo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-  const edges = new THREE.EdgesGeometry(geo);
-  const mat = new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.7 });
-  const cube = new THREE.LineSegments(edges, mat);
-  scene.add(cube);
-
-  // Inner glow sphere
-  const sGeo = new THREE.SphereGeometry(0.5, 12, 12);
-  const sEdges = new THREE.EdgesGeometry(sGeo);
-  const sMat = new THREE.LineBasicMaterial({ color: 0xb44dff, transparent: true, opacity: 0.5 });
-  const sphere = new THREE.LineSegments(sEdges, sMat);
-  scene.add(sphere);
-
-  let handPinch = false;
-  let rotSpeed = 0.01;
-
-  window._setHUDPinch = function(v) {
-    handPinch = v;
-    rotSpeed = v ? 0.04 : 0.01;
+  const N=1500, pos=new Float32Array(N*3);
+  for(let i=0;i<N*3;i++) pos[i]=(Math.random()-.5)*2200;
+  const sg=new THREE.BufferGeometry();
+  sg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  sc.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0x00e5ff,size:1.2,transparent:true,opacity:.45})));
+  // Grid plane
+  const gridGeo=new THREE.PlaneGeometry(1200,1200,30,30);
+  const gridMat=new THREE.MeshBasicMaterial({color:0x7c3aed,wireframe:true,transparent:true,opacity:.04});
+  const grid=new THREE.Mesh(gridGeo,gridMat);
+  grid.rotation.x=-Math.PI/2.4; grid.position.y=-180;
+  sc.add(grid);
+  // Rings
+  const addRing=(rad,col,op,rx,ry)=>{
+    const m=new THREE.Mesh(new THREE.TorusGeometry(rad,.6,2,100),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op}));
+    m.rotation.x=rx||0; m.rotation.y=ry||0; sc.add(m); return m;
   };
-
-  (function animate() {
-    requestAnimationFrame(animate);
-    cube.rotation.x += rotSpeed;
-    cube.rotation.y += rotSpeed * 1.4;
-    sphere.rotation.y -= rotSpeed * 0.8;
-    sphere.rotation.z += rotSpeed * 0.5;
-    renderer.render(scene, cam);
-  })();
-})();
-
-/* ============================================================
-   HOLOGRAPHIC RING BACKGROUND
-============================================================ */
-(function initHolo() {
-  const canvas = document.getElementById('holo-canvas');
-  const size = Math.min(window.innerWidth * 0.8, window.innerHeight * 0.8);
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const cx = size / 2, cy = size / 2;
-
-  (function draw(t) {
-    requestAnimationFrame(draw);
-    ctx.clearRect(0, 0, size, size);
-    for (let r = 0; r < 5; r++) {
-      const radius = 60 + r * 60 + Math.sin(t * 0.001 + r) * 10;
-      const segs = 60 + r * 12;
-      ctx.beginPath();
-      for (let i = 0; i <= segs; i++) {
-        const angle = (i / segs) * Math.PI * 2 + t * 0.0003 * (r % 2 === 0 ? 1 : -1);
-        const jitter = Math.sin(i * 7 + t * 0.002) * 2;
-        const px = cx + Math.cos(angle) * (radius + jitter);
-        const py = cy + Math.sin(angle) * (radius + jitter);
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = r % 2 === 0
-        ? `rgba(0,245,255,${0.12 + Math.sin(t * 0.001) * 0.04})`
-        : `rgba(180,77,255,${0.08 + Math.sin(t * 0.0015) * 0.03})`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
+  const r1=addRing(180,0x00e5ff,.08,Math.PI/3);
+  const r2=addRing(300,0x7c3aed,.06,Math.PI/5,.5);
+  let mx=0,my=0;
+  window.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth-.5)*.5;my=(e.clientY/innerHeight-.5)*.3});
+  (function anim(t){
+    requestAnimationFrame(anim);
+    r1.rotation.z=t*.00012; r2.rotation.z=-t*.00008;
+    sc.rotation.y+=(mx-sc.rotation.y)*.018;
+    sc.rotation.x+=(my-sc.rotation.x)*.018;
+    r.render(sc,cam);
   })(0);
+  window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight)});
 })();
 
-/* ============================================================
-   NEURAL NETWORK VISUALIZATION
-============================================================ */
-const neuralCanvas = document.getElementById('neural-canvas');
-const nCtx = neuralCanvas.getContext('2d');
-const NODES = [];
-let neuralActivity = 0;
-
-(function initNeural() {
-  const W = neuralCanvas.offsetWidth || 252;
-  const H = 130;
-  neuralCanvas.width = W; neuralCanvas.height = H;
-
-  // Create 3 layers: input(5), hidden(4), output(3)
-  const layers = [[5,0.18], [4,0.5], [3,0.82]];
-  layers.forEach(([count, xRatio]) => {
-    for (let i = 0; i < count; i++) {
-      NODES.push({
-        x: xRatio * W,
-        y: (H * 0.15) + (i / (count - 1 || 1)) * (H * 0.7),
-        layer: layers.indexOf([count, xRatio]),
-        pulse: Math.random(),
-        speed: 0.02 + Math.random() * 0.02
-      });
-    }
-  });
-})();
-
-const PARTICLES_N = [];
-function spawnNeuralParticle() {
-  // From input to hidden
-  const inputs = NODES.filter((_,i) => i < 5);
-  const hidden = NODES.filter((_,i) => i >= 5 && i < 9);
-  const src = inputs[Math.floor(Math.random() * inputs.length)];
-  const dst = hidden[Math.floor(Math.random() * hidden.length)];
-  if (!src || !dst) return;
-  PARTICLES_N.push({ x: src.x, y: src.y, tx: dst.tx || dst.x, ty: dst.ty || dst.y, ex: dst.x, ey: dst.y, prog: 0, speed: 0.012 + Math.random() * 0.01, color: Math.random() > 0.5 ? '#00f5ff' : '#b44dff' });
-}
-
-function drawNeural() {
-  const W = neuralCanvas.width, H = neuralCanvas.height;
-  nCtx.clearRect(0, 0, W, H);
-
-  // Connections
-  for (let a = 0; a < NODES.length; a++) {
-    for (let b = a + 1; b < NODES.length; b++) {
-      const dx = Math.abs(NODES[a].x - NODES[b].x);
-      if (dx < W * 0.4 && dx > 0) {
-        nCtx.beginPath();
-        nCtx.moveTo(NODES[a].x, NODES[a].y);
-        nCtx.lineTo(NODES[b].x, NODES[b].y);
-        nCtx.strokeStyle = `rgba(0,245,255,${0.05 + neuralActivity * 0.08})`;
-        nCtx.lineWidth = 0.5;
-        nCtx.stroke();
-      }
-    }
-  }
-
-  // Nodes
-  NODES.forEach(n => {
-    n.pulse = (n.pulse + n.speed * (1 + neuralActivity * 2)) % 1;
-    const glow = 0.3 + n.pulse * 0.7;
-    nCtx.beginPath();
-    nCtx.arc(n.x, n.y, 4, 0, Math.PI * 2);
-    nCtx.fillStyle = `rgba(0,245,255,${glow})`;
-    nCtx.shadowBlur = 10 * glow;
-    nCtx.shadowColor = '#00f5ff';
-    nCtx.fill();
-    nCtx.shadowBlur = 0;
-  });
-
-  // Flowing particles
-  for (let i = PARTICLES_N.length - 1; i >= 0; i--) {
-    const p = PARTICLES_N[i];
-    p.prog = Math.min(1, p.prog + p.speed);
-    const x = p.x + (p.ex - p.x) * p.prog;
-    const y = p.y + (p.ey - p.y) * p.prog;
-    nCtx.beginPath();
-    nCtx.arc(x, y, 2, 0, Math.PI * 2);
-    nCtx.fillStyle = p.color;
-    nCtx.shadowBlur = 8;
-    nCtx.shadowColor = p.color;
-    nCtx.fill();
-    nCtx.shadowBlur = 0;
-    if (p.prog >= 1) PARTICLES_N.splice(i, 1);
-  }
-}
-
-/* ============================================================
-   MOTION SPARK GRAPH
-============================================================ */
-const sparkCanvas = document.getElementById('spark-canvas');
-const sCtx = sparkCanvas.getContext('2d');
-const sparkData = new Array(80).fill(0);
-
-function drawSpark() {
-  const W = sparkCanvas.width = sparkCanvas.offsetWidth || 252;
-  const H = sparkCanvas.height = 80;
-  sCtx.clearRect(0, 0, W, H);
-
-  sCtx.beginPath();
-  const step = W / (sparkData.length - 1);
-  sparkData.forEach((v, i) => {
-    const x = i * step;
-    const y = H - (v / 100) * (H - 8) - 4;
-    i === 0 ? sCtx.moveTo(x, y) : sCtx.lineTo(x, y);
-  });
-  sCtx.strokeStyle = '#00f5ff';
-  sCtx.lineWidth = 1.5;
-  sCtx.shadowBlur = 8; sCtx.shadowColor = '#00f5ff';
-  sCtx.stroke();
-  sCtx.shadowBlur = 0;
-
+/* ====================================================================
+   ACCURACY RING (sidebar)
+==================================================================== */
+const accCanvas=document.getElementById('acc-ring');
+const accCtx=accCanvas.getContext('2d');
+let accVal=0, accTarget=0;
+function drawAccRing(){
+  const w=90,h=90,cx=45,cy=45,R=34,lw=5;
+  accCtx.clearRect(0,0,w,h);
+  // Track
+  accCtx.beginPath(); accCtx.arc(cx,cy,R,-Math.PI/2,Math.PI*1.5);
+  accCtx.strokeStyle='rgba(0,229,255,.12)'; accCtx.lineWidth=lw; accCtx.stroke();
   // Fill
-  sCtx.lineTo(W, H); sCtx.lineTo(0, H); sCtx.closePath();
-  sCtx.fillStyle = 'rgba(0,245,255,0.06)';
-  sCtx.fill();
+  const end=-Math.PI/2+Math.PI*2*(accVal/100);
+  const grd=accCtx.createLinearGradient(cx-R,cy,cx+R,cy);
+  grd.addColorStop(0,'#00e5ff'); grd.addColorStop(.5,'#7c3aed'); grd.addColorStop(1,'#e040fb');
+  accCtx.beginPath(); accCtx.arc(cx,cy,R,-Math.PI/2,end);
+  accCtx.strokeStyle=grd; accCtx.lineWidth=lw;
+  accCtx.shadowBlur=12; accCtx.shadowColor='#00e5ff'; accCtx.stroke(); accCtx.shadowBlur=0;
+  // Text
+  accCtx.fillStyle='#fff'; accCtx.font='bold 14px Orbitron'; accCtx.textAlign='center';
+  accCtx.fillText(Math.round(accVal)+'%',cx,cy+5);
+  accCtx.font='7px Inter'; accCtx.fillStyle='rgba(150,190,220,.5)';
+  accCtx.fillText('ACCURACY',cx,cy+16);
+}
+drawAccRing();
 
-  // Purple secondary line (stability)
-  sCtx.beginPath();
-  sparkData.forEach((v, i) => {
-    const x = i * step;
-    const sv = Math.max(0, v - 10 + Math.sin(i * 0.4) * 5);
-    const y = H - (sv / 100) * (H - 8) - 4;
-    i === 0 ? sCtx.moveTo(x, y) : sCtx.lineTo(x, y);
+/* ====================================================================
+   THREE.JS 3D HAND MODEL PANEL
+==================================================================== */
+const h3dCanvas=document.getElementById('hand3d-canvas');
+let h3dRenderer,h3dScene,h3dCam,h3dPoints,h3dLines,h3dWireMode=true;
+(function(){
+  const wrap=document.getElementById('hand3d-canvas-wrap');
+  const W=wrap.offsetWidth||240, H=110;
+  h3dCanvas.width=W; h3dCanvas.height=H;
+  h3dRenderer=new THREE.WebGLRenderer({canvas:h3dCanvas,alpha:true,antialias:true});
+  h3dRenderer.setPixelRatio(devicePixelRatio);
+  h3dRenderer.setSize(W,H);
+  h3dScene=new THREE.Scene();
+  h3dCam=new THREE.PerspectiveCamera(45,W/H,.1,100);
+  h3dCam.position.set(0,0,3.5);
+  // placeholder joints
+  const geo=new THREE.SphereGeometry(.04,8,8);
+  const mat=new THREE.MeshBasicMaterial({color:0x00e5ff});
+  h3dPoints=[];
+  for(let i=0;i<21;i++){const m=new THREE.Mesh(geo,mat.clone());h3dScene.add(m);h3dPoints.push(m);}
+  // connections
+  const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  const lMat=new THREE.LineBasicMaterial({color:0x7c3aed,transparent:true,opacity:.7});
+  h3dLines=[];
+  CONN.forEach(([a,b])=>{
+    const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
+    const l=new THREE.Line(g,lMat.clone());
+    h3dScene.add(l); h3dLines.push({line:l,a,b});
   });
-  sCtx.strokeStyle = 'rgba(180,77,255,0.5)';
-  sCtx.lineWidth = 1;
-  sCtx.stroke();
+  // tabs
+  document.getElementById('tab-wire').addEventListener('click',()=>{h3dWireMode=true;document.getElementById('tab-wire').classList.add('active');document.getElementById('tab-solid').classList.remove('active')});
+  document.getElementById('tab-solid').addEventListener('click',()=>{h3dWireMode=false;document.getElementById('tab-solid').classList.add('active');document.getElementById('tab-wire').classList.remove('active')});
+  (function anim(){requestAnimationFrame(anim);h3dScene.rotation.y+=.008;h3dRenderer.render(h3dScene,h3dCam);})();
+})();
+
+function update3DHandModel(hand){
+  if(!hand||!h3dPoints) return;
+  const xs=hand.map(p=>p.x), ys=hand.map(p=>p.y), zs=hand.map(p=>p.z||0);
+  const cx=(Math.max(...xs)+Math.min(...xs))/2, cy=(Math.max(...ys)+Math.min(...ys))/2;
+  const scale=2.5;
+  hand.forEach((p,i)=>{
+    h3dPoints[i].position.set((p.x-cx)*scale*2,(-(p.y-cy))*scale*2,(p.z||0)*scale*8);
+    const t=Date.now()*.004+i;
+    const c=h3dWireMode?new THREE.Color(`hsl(${180+i*8},100%,${50+Math.sin(t)*10}%)`):new THREE.Color(.2,.6,1);
+    h3dPoints[i].material.color=c;
+    if(!h3dWireMode){h3dPoints[i].material.color.setHSL(.55,.8,.4+((p.z||0)+.1)*2)}
+  });
+  h3dLines.forEach(({line,a,b})=>{
+    const pa=h3dPoints[a].position, pb=h3dPoints[b].position;
+    const pos=line.geometry.attributes.position;
+    pos.setXYZ(0,pa.x,pa.y,pa.z); pos.setXYZ(1,pb.x,pb.y,pb.z);
+    pos.needsUpdate=true;
+    line.material.opacity=h3dWireMode?.7:.3;
+  });
 }
 
-/* ============================================================
-   GLOBAL PARTICLE ENGINE (canvas overlay)
-============================================================ */
-const pCanvas = document.getElementById('particle-canvas');
-const pCtx = pCanvas.getContext('2d');
-pCanvas.width = innerWidth; pCanvas.height = innerHeight;
+/* ====================================================================
+   LANDMARKS 3D CANVAS (bottom-left)
+==================================================================== */
+const lm3dCanvas=document.getElementById('lm3d-canvas');
+const lmCtx=lm3dCanvas.getContext('2d');
+let lmAngle=.4, lmDragging=false, lmLastX=0;
+let lastLandmarks=null;
 
-const SCREEN_PARTICLES = [];
-class ScreenParticle {
-  constructor(x, y, color) {
-    this.x = x; this.y = y;
-    this.vx = (Math.random() - 0.5) * 5;
-    this.vy = (Math.random() - 0.5) * 5 - 1;
-    this.color = color;
-    this.life = 1;
-    this.decay = 0.02 + Math.random() * 0.03;
-    this.r = 2 + Math.random() * 3;
+lm3dCanvas.addEventListener('mousedown',e=>{lmDragging=true;lmLastX=e.clientX});
+window.addEventListener('mousemove',e=>{if(lmDragging){lmAngle+=(e.clientX-lmLastX)*.01;lmLastX=e.clientX}});
+window.addEventListener('mouseup',()=>lmDragging=false);
+document.getElementById('lm3d-reset').addEventListener('click',()=>{lmAngle=.4});
+
+function drawLM3D(){
+  const W=lm3dCanvas.width, H=lm3dCanvas.height;
+  lmCtx.clearRect(0,0,W,H);
+  if(!lastLandmarks){
+    // placeholder skeleton
+    lmCtx.fillStyle='rgba(0,229,255,.12)';
+    lmCtx.fillRect(0,0,W,H);
+    lmCtx.fillStyle='rgba(0,229,255,.3)';
+    lmCtx.font='9px Orbitron'; lmCtx.textAlign='center';
+    lmCtx.fillText('NO DATA',W/2,H/2);
+    return;
   }
-  update() { this.x += this.vx; this.y += this.vy; this.vy += 0.15; this.life -= this.decay; }
-  draw() {
-    pCtx.save();
-    pCtx.globalAlpha = this.life;
-    pCtx.fillStyle = this.color;
-    pCtx.shadowBlur = 12; pCtx.shadowColor = this.color;
-    pCtx.beginPath(); pCtx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2); pCtx.fill();
+  const hand=lastLandmarks;
+  const xs=hand.map(p=>p.x),ys=hand.map(p=>p.y),zs=hand.map(p=>p.z||0);
+  const cx=(Math.max(...xs)+Math.min(...xs))/2, cy=(Math.max(...ys)+Math.min(...ys))/2;
+  const sc=Math.min(W,H)*.85;
+  const proj=hand.map(p=>{
+    const rx=(p.x-cx)*Math.cos(lmAngle)-(p.z||0)*.1*Math.sin(lmAngle);
+    const ry=-(p.y-cy);
+    const rz=(p.x-cx)*Math.sin(lmAngle)+(p.z||0)*.1*Math.cos(lmAngle);
+    const px=W/2+rx*sc, py=H/2+ry*sc*.9+rz*20;
+    return{x:px,y:py,z:rz};
+  });
+  const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  // connections
+  CONN.forEach(([a,b])=>{
+    const pa=proj[a],pb=proj[b];
+    const depth=(pa.z+pb.z)/2;
+    lmCtx.beginPath(); lmCtx.moveTo(pa.x,pa.y); lmCtx.lineTo(pb.x,pb.y);
+    lmCtx.strokeStyle=`rgba(124,58,237,${.5+depth*.1})`; lmCtx.lineWidth=1.5; lmCtx.stroke();
+  });
+  // joints
+  const TIP_COLS=['#ff1744','#00e5ff','#e040fb','#00e676','#ffc107'];
+  proj.forEach((p,i)=>{
+    const isTip=[4,8,12,16,20].includes(i);
+    const fi=[4,8,12,16,20].indexOf(i);
+    const col=isTip?TIP_COLS[fi]:'rgba(0,229,255,.8)';
+    const r=isTip?5:3;
+    lmCtx.beginPath(); lmCtx.arc(p.x,p.y,r,0,Math.PI*2);
+    lmCtx.fillStyle=col; lmCtx.shadowBlur=isTip?14:6; lmCtx.shadowColor=col; lmCtx.fill();
+    lmCtx.shadowBlur=0;
+  });
+  // axis labels
+  lmCtx.font='8px Orbitron'; lmCtx.textAlign='left'; lmCtx.fillStyle='rgba(0,229,255,.35)';
+  lmCtx.fillText('X',4,H-4); lmCtx.fillText('Y',14,H-4); lmCtx.fillText('Z',24,H-4);
+}
+
+/* ====================================================================
+   WAVEFORM (Motion Analytics)
+==================================================================== */
+const waveCanvas=document.getElementById('wave-canvas');
+const wCtx=waveCanvas.getContext('2d');
+const waveData=new Array(60).fill(0);
+const waveData2=new Array(60).fill(0);
+const waveData3=new Array(60).fill(0);
+
+function drawWave(){
+  const W=waveCanvas.width=waveCanvas.offsetWidth||240, H=48;
+  waveCanvas.height=H;
+  wCtx.clearRect(0,0,W,H);
+  [[waveData,'#00e5ff'],[waveData2,'#7c3aed'],[waveData3,'#e040fb']].forEach(([data,col],di)=>{
+    wCtx.beginPath();
+    data.forEach((v,i)=>{
+      const x=i*(W/(data.length-1));
+      const y=H/2-(v/100)*(H/2-4);
+      i===0?wCtx.moveTo(x,y):wCtx.lineTo(x,y);
+    });
+    wCtx.strokeStyle=col; wCtx.lineWidth=1.5; wCtx.shadowBlur=6; wCtx.shadowColor=col; wCtx.stroke();
+    wCtx.shadowBlur=0;
+  });
+}
+
+/* ====================================================================
+   NEURAL NETWORK CANVAS (bottom-right)
+==================================================================== */
+const neuralCanvas=document.getElementById('neural-canvas');
+const nCtx=neuralCanvas.getContext('2d');
+let neuralActivity=0;
+const NNODES=[];
+const NPARTS=[];
+
+(function(){
+  const W=240,H=130;
+  const layers=[[4,.15],[5,.4],[4,.65],[3,.88]];
+  layers.forEach(([cnt,xr],li)=>{
+    for(let i=0;i<cnt;i++) NNODES.push({x:xr,y:(i/(cnt-1||1))*.75+.12,layer:li,pulse:Math.random(),speed:.015+Math.random()*.02});
+  });
+})();
+
+function spawnNPart(){
+  const l0=NNODES.filter(n=>n.layer===0), l1=NNODES.filter(n=>n.layer===1);
+  if(!l0.length||!l1.length) return;
+  const a=l0[Math.floor(Math.random()*l0.length)];
+  const b=l1[Math.floor(Math.random()*l1.length)];
+  NPARTS.push({sx:a.x,sy:a.y,ex:b.x,ey:b.y,prog:0,spd:.014+Math.random()*.012,col:Math.random()>.5?'#00e5ff':'#7c3aed'});
+}
+
+function drawNeural(){
+  const W=neuralCanvas.width=neuralCanvas.offsetWidth||240;
+  const H=neuralCanvas.height=neuralCanvas.offsetHeight||130;
+  nCtx.clearRect(0,0,W,H);
+
+  // connections
+  NNODES.forEach((a,ai)=>{
+    NNODES.forEach((b,bi)=>{
+      if(bi<=ai||Math.abs(a.layer-b.layer)!==1) return;
+      nCtx.beginPath();
+      nCtx.moveTo(a.x*W,a.y*H); nCtx.lineTo(b.x*W,b.y*H);
+      nCtx.strokeStyle=`rgba(124,58,237,${.04+neuralActivity*.1})`;
+      nCtx.lineWidth=.8; nCtx.stroke();
+    });
+  });
+
+  // nodes
+  NNODES.forEach(n=>{
+    n.pulse=(n.pulse+n.speed*(1+neuralActivity*3))%1;
+    const g=.25+n.pulse*.75;
+    nCtx.beginPath(); nCtx.arc(n.x*W,n.y*H,3.5,0,Math.PI*2);
+    const col=n.layer%2===0?'#00e5ff':'#7c3aed';
+    nCtx.fillStyle=`rgba(${n.layer%2===0?'0,229,255':'124,58,237'},${g})`;
+    nCtx.shadowBlur=10*g; nCtx.shadowColor=col; nCtx.fill(); nCtx.shadowBlur=0;
+  });
+
+  // flowing particles
+  for(let i=NPARTS.length-1;i>=0;i--){
+    const p=NPARTS[i];
+    p.prog=Math.min(1,p.prog+p.spd);
+    const x=p.sx+(p.ex-p.sx)*p.prog, y=p.sy+(p.ey-p.sy)*p.prog;
+    nCtx.beginPath(); nCtx.arc(x*W,y*H,1.8,0,Math.PI*2);
+    nCtx.fillStyle=p.col; nCtx.shadowBlur=8; nCtx.shadowColor=p.col; nCtx.fill(); nCtx.shadowBlur=0;
+    if(p.prog>=1) NPARTS.splice(i,1);
+  }
+}
+
+/* ====================================================================
+   SCREEN PARTICLE ENGINE
+==================================================================== */
+const pCanvas=document.getElementById('ptcl-canvas');
+const pCtx=pCanvas.getContext('2d');
+pCanvas.width=innerWidth; pCanvas.height=innerHeight;
+const SPARTS=[];
+class SP{
+  constructor(x,y,col){this.x=x;this.y=y;this.vx=(Math.random()-.5)*5;this.vy=(Math.random()-.5)*5-1.5;this.col=col;this.life=1;this.decay=.025+Math.random()*.025;this.r=1.8+Math.random()*2.2}
+  update(){this.x+=this.vx;this.y+=this.vy;this.vy+=.12;this.vx*=.97;this.life-=this.decay}
+  draw(){
+    pCtx.save();pCtx.globalAlpha=this.life;
+    pCtx.fillStyle=this.col;pCtx.shadowBlur=10;pCtx.shadowColor=this.col;
+    pCtx.beginPath();pCtx.arc(this.x,this.y,this.r*this.life,0,Math.PI*2);pCtx.fill();
     pCtx.restore();
   }
 }
 
-/* ============================================================
-   HAND TRACKING ENGINE
-============================================================ */
-const videoElement  = document.getElementById('input_video');
-const canvasElement = document.getElementById('output_canvas');
-const canvasCtx     = canvasElement.getContext('2d');
-
-// --- State ---
-let isCameraActive = false;
-let startTime = Date.now();
-let frameCount = 0, totalFrames = 0;
-let lastFpsTime = Date.now(), fpsVal = 0;
-let lastFrameTime = Date.now();
-let currentGesture = "STANDBY";
-let currentDepth = 0;
-let confidence = 0;
-let stabilityScore = 0;
-let velSmooth = 0;
-let handHistory = [];
-let prevWrist = null;
-
-// Tuner for trail particles on canvas
-const TIP_COLORS = ['#ff2d78','#00f5ff','#b44dff','#00ff88','#ffc800'];
-
-function dist(p1, p2, w, h) {
-  const dx = (p1.x - p2.x) * w;
-  const dy = (p1.y - p2.y) * h;
-  return Math.sqrt(dx*dx + dy*dy);
+function spawnBurst(x,y,col,n=12){
+  for(let i=0;i<n;i++) SPARTS.push(new SP(x,y,col));
 }
 
-function classifyGesture(hand, fingersUp, dTI, w, h) {
-  const upCount = fingersUp.filter(Boolean).length;
-  const [tUp, iUp, mUp, rUp, pUp] = fingersUp;
-  const dIM = dist(hand[8], hand[12], w, h);
-  const dMR = dist(hand[12], hand[16], w, h);
-  const area = (Math.max(...hand.map(p=>p.x)) - Math.min(...hand.map(p=>p.x))) *
-               (Math.max(...hand.map(p=>p.y)) - Math.min(...hand.map(p=>p.y))) * w * h;
+/* ====================================================================
+   GESTURE HISTORY
+==================================================================== */
+const gestHistory=[];
+const gestEmoji={
+  'OPEN PALM':'✋','FIST':'✊','PEACE':'✌️','POINT':'👉','THUMBS UP':'👍',
+  'PINCH':'🤏','FIVE SPREAD':'🖐️','ROCK / HORNS':'🤟','CALL ME':'🤙',
+  'CROSS FINGERS':'🤞','SPIDER-MAN':'🤟','VULCAN':'🖖','FINGER HEART':'❤️','FINGER GUN':'👉'
+};
+const gestIcons={
+  'OPEN PALM':'fa-hand','FIST':'fa-hand-fist','PEACE':'fa-hand-peace',
+  'POINT':'fa-hand-point-right','THUMBS UP':'fa-thumbs-up','PINCH':'fa-hand-pinch',
+  'FIVE SPREAD':'fa-hand','default':'fa-hand'
+};
+let lastGestTime=0, totalGestures=0;
 
-  if (upCount === 5) return area > 80000 ? "FIVE SPREAD" : "OPEN PALM";
-  if (upCount === 0) return "FIST";
-  if (dTI < 30 && upCount <= 2) return dTI < 14 ? "FINGER HEART" : "PINCH";
-  if (upCount === 2 && iUp && mUp) return dIM < 15 ? "CROSS FINGERS" : "PEACE";
-  if (upCount === 3 && tUp && iUp && pUp) return "SPIDER-MAN";
-  if (upCount === 1) {
-    if (iUp) return "POINT";
-    if (tUp) return "THUMBS UP";
-    return "ONE";
-  }
-  if (upCount === 2) {
-    if (iUp && pUp) return "ROCK / HORNS";
-    if (tUp && pUp) return "CALL ME";
-    if (tUp && iUp) return "FINGER GUN";
-  }
-  if (upCount === 4 && !tUp) return dMR > 60 ? "VULCAN" : "FOUR FINGERS";
-  return `${upCount} FINGERS`;
+function pushGesture(g){
+  const now=Date.now();
+  if(now-lastGestTime<1500&&gestHistory.length&&gestHistory[0].g===g) return;
+  lastGestTime=now; totalGestures++;
+  document.getElementById('sess-gest').textContent=totalGestures;
+  const t=new Date(); const ts=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  gestHistory.unshift({g,ts});
+  if(gestHistory.length>5) gestHistory.pop();
+  const container=document.getElementById('gest-history');
+  container.innerHTML=gestHistory.map(h=>{
+    const icon=gestIcons[h.g]||gestIcons.default;
+    return `<div class="gh-row"><div class="gh-gest"><i class="fa-solid ${icon}"></i>${h.g}</div><span class="gh-time">${h.ts}</span></div>`;
+  }).join('');
 }
 
-// --- Drawing ---
-const CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+/* ====================================================================
+   HAND TRACKING + CANVAS DRAWING
+==================================================================== */
+const videoEl=document.getElementById('input_video');
+const camCanvas=document.getElementById('output_canvas');
+const camCtx=camCanvas.getContext('2d');
 
-function drawGlowLine(ctx, x1, y1, x2, y2, color, width, glowSize) {
-  ctx.save();
-  ctx.shadowBlur = glowSize; ctx.shadowColor = color;
-  ctx.strokeStyle = color; ctx.lineWidth = width;
-  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-  ctx.restore();
+let isCameraActive=false;
+let sessionStart=Date.now();
+let frameCount=0,totalFrames=0,lastFpsTime=Date.now(),fps=0,maxFps=0,fpsSum=0,fpsCount=0;
+let lastFrameTime=Date.now();
+let currentGesture='STANDBY', prevGesture='';
+let handDepth=0, velSmooth=0, stabilityScore=100, smoothScore=100;
+let prevWrist=null, handHistory=[];
+let showNeural=true, showMesh=true, showHeat=false;
+let gestureCount=0;
+
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const TIP_IDX=[4,8,12,16,20];
+const TIP_COLS=['#ff1744','#00e5ff','#e040fb','#00e676','#ffc107'];
+
+function dist(a,b,W,H){
+  return Math.hypot((a.x-b.x)*W,(a.y-b.y)*H);
 }
 
-function drawHandOverlay(ctx, hand, w, h, handIndex) {
-  const mx = p => (1 - p.x) * w;
-  const my = p => p.y * h;
+function classifyGesture(hand,fingersUp,dTI,W,H){
+  const uc=fingersUp.filter(Boolean).length;
+  const [tU,iU,mU,rU,pU]=fingersUp;
+  const dIM=dist(hand[8],hand[12],W,H);
+  const dMR=dist(hand[12],hand[16],W,H);
+  const area=(Math.max(...hand.map(p=>p.x))-Math.min(...hand.map(p=>p.x)))*(Math.max(...hand.map(p=>p.y))-Math.min(...hand.map(p=>p.y)))*W*H;
+  if(uc===5) return area>80000?'FIVE SPREAD':'OPEN PALM';
+  if(uc===0) return 'FIST';
+  if(dTI<30&&uc<=2) return dTI<14?'FINGER HEART':'PINCH';
+  if(uc===2&&iU&&mU) return dIM<15?'CROSS FINGERS':'PEACE';
+  if(uc===3&&tU&&iU&&pU) return 'SPIDER-MAN';
+  if(uc===1){if(iU) return 'POINT'; if(tU) return 'THUMBS UP';}
+  if(uc===2){if(iU&&pU) return 'ROCK / HORNS'; if(tU&&pU) return 'CALL ME'; if(tU&&iU) return 'FINGER GUN';}
+  if(uc===4&&!tU) return dMR>60?'VULCAN':'FOUR FINGERS';
+  return `${uc} FINGERS`;
+}
 
-  const tips  = [4, 8, 12, 16, 20];
-  const joints= [2, 6, 10, 14, 18];
-  const wrist = hand[0];
+// Velocity trail history
+const trailHistory=[];
 
-  // --- finger state ---
-  const fingersUp = tips.map((tip, i) => {
-    const dT = dist(hand[tip], wrist, w, h);
-    const dJ = dist(hand[joints[i]], wrist, w, h);
-    return dT > dJ;
-  });
+function drawHandCanvas(ctx,hand,W,H,idx){
+  const mx=p=>(1-p.x)*W, my=p=>p.y*H;
+  const wrist=hand[0];
+  const JNTS=[2,6,10,14,18];
+  const fingersUp=TIP_IDX.map((tip,i)=>dist(hand[tip],wrist,W,H)>dist(hand[JNTS[i]],wrist,W,H));
+  const dTI=dist(hand[4],hand[8],W,H);
 
-  const dTI = dist(hand[4], hand[8], w, h);
+  if(idx===0){
+    currentGesture=classifyGesture(hand,fingersUp,dTI,W,H);
 
-  if (handIndex === 0) {
-    currentGesture = classifyGesture(hand, fingersUp, dTI, w, h);
-
-    // Virtual button triggers
-    document.getElementById('vbtn-2').classList.toggle('triggered', dTI < 30);
-    document.getElementById('vbtn-0').classList.toggle('triggered', fingersUp[1] && !fingersUp[2]);
-    document.getElementById('vbtn-1').classList.toggle('triggered', currentGesture === 'OPEN PALM');
-    document.getElementById('vbtn-3').classList.toggle('triggered', currentGesture === 'FIVE SPREAD');
-
-    // 3D HUD control
-    if (typeof window._setHUDPinch === 'function') window._setHUDPinch(dTI < 30);
-
-    // Coordinates
-    document.getElementById('cx').textContent = (wrist.x * w).toFixed(1) + 'px';
-    document.getElementById('cy').textContent = (wrist.y * h).toFixed(1) + 'px';
-    document.getElementById('cz').textContent = (wrist.z * 100).toFixed(2);
-    const spreadX = (Math.max(...hand.map(p=>p.x)) - Math.min(...hand.map(p=>p.x))) * w;
-    document.getElementById('csp').textContent = spreadX.toFixed(0) + 'px';
-
-    // Depth
-    const area = (Math.max(...hand.map(p=>p.x)) - Math.min(...hand.map(p=>p.x))) *
-                 (Math.max(...hand.map(p=>p.y)) - Math.min(...hand.map(p=>p.y))) * w * h;
-    currentDepth = Math.min(100, Math.round((area / 60000) * 100));
+    // Depth estimation
+    const area=(Math.max(...hand.map(p=>p.x))-Math.min(...hand.map(p=>p.x)))*(Math.max(...hand.map(p=>p.y))-Math.min(...hand.map(p=>p.y)))*W*H;
+    handDepth=Math.min(100,Math.round((area/60000)*100));
 
     // Velocity
-    if (prevWrist) {
-      const vx = (wrist.x - prevWrist.x) * w;
-      const vy = (wrist.y - prevWrist.y) * h;
-      const vel = Math.sqrt(vx*vx + vy*vy) * 60;
-      velSmooth += (Math.min(vel, 500) - velSmooth) * 0.2;
+    if(prevWrist){
+      const vx=(wrist.x-prevWrist.x)*W, vy=(wrist.y-prevWrist.y)*H;
+      const vel=Math.hypot(vx,vy)*60;
+      velSmooth+=(Math.min(vel,600)-velSmooth)*.18;
     }
-    prevWrist = { x: wrist.x, y: wrist.y };
+    prevWrist={x:wrist.x,y:wrist.y};
 
-    // Stability (low-pass on hand movement)
-    handHistory.push({ x: wrist.x, y: wrist.y });
-    if (handHistory.length > 30) handHistory.shift();
-    if (handHistory.length > 10) {
-      const xv = handHistory.map(p => p.x);
-      const yv = handHistory.map(p => p.y);
-      const stdX = Math.sqrt(xv.map(v => (v - xv.reduce((a,b)=>a+b)/xv.length)**2).reduce((a,b)=>a+b)/xv.length);
-      const stdY = Math.sqrt(yv.map(v => (v - yv.reduce((a,b)=>a+b)/yv.length)**2).reduce((a,b)=>a+b)/yv.length);
-      stabilityScore = Math.max(0, Math.min(100, 100 - (stdX + stdY) * 1000));
+    // Stability
+    handHistory.push({x:wrist.x,y:wrist.y});
+    if(handHistory.length>30) handHistory.shift();
+    if(handHistory.length>8){
+      const xv=handHistory.map(p=>p.x), yv=handHistory.map(p=>p.y);
+      const mx2=xv.reduce((a,b)=>a+b)/xv.length, my2=yv.reduce((a,b)=>a+b)/yv.length;
+      const stdX=Math.sqrt(xv.map(v=>(v-mx2)**2).reduce((a,b)=>a+b)/xv.length);
+      const stdY=Math.sqrt(yv.map(v=>(v-my2)**2).reduce((a,b)=>a+b)/yv.length);
+      stabilityScore=Math.max(0,Math.min(100,100-(stdX+stdY)*900));
     }
+    smoothScore=Math.min(100,Math.round(100-velSmooth/6));
 
-    // Update finger nodes
-    fingersUp.forEach((up, i) => {
-      document.getElementById(`fn-${i}`).classList.toggle('up', up);
+    // Velocity trail
+    trailHistory.push({x:mx(wrist),y:my(wrist),t:Date.now()});
+    if(trailHistory.length>20) trailHistory.shift();
+
+    // Coordinates
+    document.getElementById('cx').textContent=((wrist.x)*W).toFixed(0)+'px';
+    document.getElementById('cy').textContent=((wrist.y)*H).toFixed(0)+'px';
+    document.getElementById('cz').textContent=(wrist.z||0).toFixed(3);
+    document.getElementById('ix').textContent=((hand[8].x)*W).toFixed(0)+'px';
+    document.getElementById('iy').textContent=((hand[8].y)*H).toFixed(0)+'px';
+    document.getElementById('iz').textContent=((hand[8].z||0)).toFixed(3);
+    // bars
+    const setBar=(id,v)=>{document.getElementById(id).style.width=Math.min(100,Math.max(0,v*100))+'%'};
+    setBar('cx-bar',wrist.x); setBar('cy-bar',wrist.y); setBar('cz-bar',Math.min(1,Math.abs(wrist.z||0)*10+.5));
+    setBar('ix-bar',hand[8].x); setBar('iy-bar',hand[8].y); setBar('iz-bar',Math.min(1,Math.abs((hand[8].z||0))*10+.5));
+  }
+
+  // === VELOCITY TRAIL ===
+  if(showMesh&&trailHistory.length>2){
+    for(let i=1;i<trailHistory.length;i++){
+      const alpha=(i/trailHistory.length)*0.3;
+      ctx.save();
+      ctx.strokeStyle=`rgba(0,229,255,${alpha})`;
+      ctx.lineWidth=3*(i/trailHistory.length);
+      ctx.shadowBlur=8; ctx.shadowColor='#00e5ff';
+      ctx.beginPath(); ctx.moveTo(trailHistory[i-1].x,trailHistory[i-1].y);
+      ctx.lineTo(trailHistory[i].x,trailHistory[i].y); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // === HEATMAP GLOW on palm ===
+  if(showHeat){
+    const wX=mx(wrist), wY=my(wrist);
+    const heatGrd=ctx.createRadialGradient(wX,wY,0,wX,wY,120);
+    heatGrd.addColorStop(0,'rgba(224,64,251,.25)'); heatGrd.addColorStop(.4,'rgba(124,58,237,.12)'); heatGrd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.save(); ctx.fillStyle=heatGrd; ctx.beginPath(); ctx.arc(wX,wY,120,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+
+  // === SKELETON ===
+  if(showMesh){
+    CONN.forEach(([a,b])=>{
+      const isTip=a>=4&&b>=4;
+      ctx.save();
+      ctx.shadowBlur=isTip?16:8;
+      ctx.shadowColor=isTip?'#7c3aed':'#00e5ff';
+      ctx.strokeStyle=isTip?'rgba(124,58,237,.8)':'rgba(0,229,255,.65)';
+      ctx.lineWidth=isTip?2.5:2;
+      ctx.beginPath(); ctx.moveTo(mx(hand[a]),my(hand[a])); ctx.lineTo(mx(hand[b]),my(hand[b])); ctx.stroke();
+      ctx.restore();
     });
   }
 
-  // --- Skeleton lines ---
-  CONNECTIONS.forEach(([a, b]) => {
-    const isFingerTip = (a >= 4 && b >= 4);
-    const color = isFingerTip ? 'rgba(180,77,255,0.7)' : 'rgba(0,245,255,0.55)';
-    const glow  = isFingerTip ? 12 : 8;
-    drawGlowLine(ctx, mx(hand[a]), my(hand[a]), mx(hand[b]), my(hand[b]), color, 2, glow);
-  });
-
-  // --- Neural network lines between fingertips ---
-  const tipPts = tips.map(i => ({ x: mx(hand[i]), y: my(hand[i]) }));
-  for (let a = 0; a < tipPts.length; a++) {
-    for (let b = a + 1; b < tipPts.length; b++) {
-      const d = Math.hypot(tipPts[a].x - tipPts[b].x, tipPts[a].y - tipPts[b].y);
-      const alpha = Math.max(0, 1 - d / 320) * 0.3;
-      if (alpha > 0.05) {
+  // === NEURAL CONNECTIONS between fingertips ===
+  if(showNeural){
+    const tips=TIP_IDX.map(i=>({x:mx(hand[i]),y:my(hand[i])}));
+    for(let a=0;a<tips.length;a++){
+      for(let b=a+1;b<tips.length;b++){
+        const d=Math.hypot(tips[a].x-tips[b].x,tips[a].y-tips[b].y);
+        const al=Math.max(0,1-d/300)*0.35;
+        if(al>.04){
+          ctx.save();
+          ctx.beginPath(); ctx.moveTo(tips[a].x,tips[a].y); ctx.lineTo(tips[b].x,tips[b].y);
+          // animated dash flow
+          const dashOff=(Date.now()*.04)%20;
+          ctx.setLineDash([6,14]); ctx.lineDashOffset=-dashOff;
+          ctx.strokeStyle=`rgba(224,64,251,${al})`; ctx.lineWidth=1.5;
+          ctx.shadowBlur=10; ctx.shadowColor='#e040fb'; ctx.stroke();
+          ctx.setLineDash([]); ctx.restore();
+        }
+      }
+    }
+    // extra cross-connections wrist to all tips
+    tips.forEach((tp,fi)=>{
+      const wX=mx(hand[0]), wY=my(hand[0]);
+      const d=Math.hypot(tp.x-wX,tp.y-wY);
+      const al=Math.max(0,.35-d/600);
+      if(al>.02){
         ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(tipPts[a].x, tipPts[a].y);
-        ctx.lineTo(tipPts[b].x, tipPts[b].y);
-        ctx.strokeStyle = `rgba(180,77,255,${alpha})`;
-        ctx.lineWidth = 1; ctx.stroke();
-        ctx.restore();
+        ctx.beginPath(); ctx.moveTo(wX,wY); ctx.lineTo(tp.x,tp.y);
+        ctx.strokeStyle=`rgba(0,229,255,${al})`; ctx.lineWidth=1;
+        ctx.setLineDash([3,18]); ctx.lineDashOffset=-(Date.now()*.03)%21;
+        ctx.stroke(); ctx.setLineDash([]); ctx.restore();
       }
-    }
+    });
   }
 
-  // --- Pulsating joint nodes ---
-  const nodeColors = ['rgba(0,245,255,0.9)', 'rgba(180,77,255,0.9)', 'rgba(255,45,120,0.9)', 'rgba(0,255,136,0.9)', 'rgba(255,200,0,0.9)'];
-  tips.forEach((tip, fi) => {
-    const x = mx(hand[tip]), y = my(hand[tip]);
-    const t = (Date.now() * 0.005 + fi * 1.2) % (Math.PI * 2);
-    const r = 5 + Math.sin(t) * 2;
+  // === PULSATING TIP NODES + ORBIT RING ===
+  TIP_IDX.forEach((ti,fi)=>{
+    const x=mx(hand[ti]), y=my(hand[ti]);
+    const t=(Date.now()*.005+fi*1.2)%(Math.PI*2);
+    const r=6+Math.sin(t)*2.5;
+    // orbit ring
     ctx.save();
-    ctx.shadowBlur = 20 + Math.sin(t) * 10;
-    ctx.shadowColor = TIP_COLORS[fi];
-    ctx.fillStyle = TIP_COLORS[fi];
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,r+10,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${fi%2===0?'0,229,255':'224,64,251'},.15)`; ctx.lineWidth=1; ctx.stroke();
     ctx.restore();
-
-    // Particle trail
-    if (isCameraActive) {
-      const rect = canvasElement.getBoundingClientRect();
-      const scaleX = rect.width / w, scaleY = rect.height / h;
-      const sx = rect.left + x * scaleX, sy = rect.top + y * scaleY;
-      for (let k = 0; k < 1; k++) {
-        SCREEN_PARTICLES.push(new ScreenParticle(sx, sy, TIP_COLORS[fi]));
-      }
+    // node
+    ctx.save();
+    ctx.shadowBlur=20+Math.sin(t)*8; ctx.shadowColor=TIP_COLS[fi];
+    ctx.fillStyle=TIP_COLS[fi];
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // screen particles
+    if(isCameraActive&&Math.random()<.4){
+      const rect=camCanvas.getBoundingClientRect();
+      const sx=rect.left+x*(rect.width/W), sy=rect.top+y*(rect.height/H);
+      SPARTS.push(new SP(sx,sy,TIP_COLS[fi]));
     }
   });
 
-  // All other joints
-  for (let i = 0; i < hand.length; i++) {
-    if (tips.includes(i)) continue;
+  // === ALL OTHER JOINTS ===
+  for(let i=0;i<hand.length;i++){
+    if(TIP_IDX.includes(i)) continue;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,245,255,0.6)';
-    ctx.shadowBlur = 6; ctx.shadowColor = '#00f5ff';
-    ctx.beginPath(); ctx.arc(mx(hand[i]), my(hand[i]), 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle='rgba(0,229,255,.7)'; ctx.shadowBlur=8; ctx.shadowColor='#00e5ff';
+    ctx.beginPath(); ctx.arc(mx(hand[i]),my(hand[i]),3,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
 
-  // Wrist label
+  // === PALM CIRCLE HUD RING ===
+  const palmX=mx(hand[0]), palmY=my(hand[0]);
+  const palmR=60+handDepth*.3;
   ctx.save();
-  ctx.font = '600 11px Orbitron';
-  ctx.fillStyle = '#00f5ff';
-  ctx.shadowBlur = 8; ctx.shadowColor = '#00f5ff';
-  ctx.fillText(`H${handIndex + 1}`, mx(wrist) + 10, my(wrist) + 14);
-  ctx.restore();
+  ctx.beginPath(); ctx.arc(palmX,palmY,palmR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,229,255,.12)'; ctx.lineWidth=1; ctx.setLineDash([4,8]);
+  ctx.lineDashOffset=-(Date.now()*.05)%12; ctx.stroke(); ctx.setLineDash([]); ctx.restore();
 }
 
-function drawHUD(ctx, w, h, handsCount) {
-  // FPS badge top-right
+function drawCamHUD(ctx,W,H,handsCount){
+  // FPS top right
   ctx.save();
-  ctx.font = 'bold 12px Orbitron';
-  ctx.fillStyle = '#00f5ff';
-  ctx.shadowBlur = 12; ctx.shadowColor = '#00f5ff';
-  ctx.fillText(`${fpsVal} FPS`, w - 90, 30);
-  ctx.restore();
+  ctx.font='bold 13px Orbitron'; ctx.fillStyle='#00e5ff';
+  ctx.shadowBlur=12; ctx.shadowColor='#00e5ff';
+  ctx.textAlign='right'; ctx.fillText(`${fps} FPS`,W-16,28); ctx.restore();
 
-  // Gesture label bottom-center
-  if (isCameraActive && handsCount > 0) {
+  // Corner brackets
+  [[16,16,1,1],[W-16,16,-1,1],[16,H-16,1,-1],[W-16,H-16,-1,-1]].forEach(([cx,cy,dx,dy])=>{
+    const bl=18;
+    ctx.save(); ctx.strokeStyle='rgba(0,229,255,.5)'; ctx.lineWidth=2; ctx.shadowBlur=8; ctx.shadowColor='#00e5ff';
+    ctx.beginPath(); ctx.moveTo(cx+dx*bl,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*bl); ctx.stroke(); ctx.restore();
+  });
+
+  // Gesture label bottom center
+  if(isCameraActive&&handsCount>0){
+    const label=currentGesture;
     ctx.save();
-    const label = currentGesture;
-    const gw = ctx.measureText(label).width + 30;
-    const gx = w / 2 - gw / 2;
-    const gy = h - 60;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(gx, gy, gw, 36, 6) : ctx.rect(gx, gy, gw, 36);
+    ctx.font='bold 15px Orbitron'; ctx.textAlign='center';
+    const gw=ctx.measureText(label).width+28;
+    const gx=W/2-gw/2, gy=H-52;
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    if(ctx.roundRect) ctx.roundRect(gx,gy,gw,32,5); else ctx.rect(gx,gy,gw,32);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,245,255,0.5)';
-    ctx.lineWidth = 1; ctx.stroke();
-    ctx.font = 'bold 14px Orbitron';
-    ctx.fillStyle = '#00f5ff';
-    ctx.shadowBlur = 14; ctx.shadowColor = '#00f5ff';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, w / 2, gy + 24);
-    ctx.restore();
+    ctx.strokeStyle='rgba(0,229,255,.45)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#00e5ff'; ctx.shadowBlur=14; ctx.shadowColor='#00e5ff';
+    ctx.fillText(label,W/2,gy+22); ctx.restore();
   }
 
-  // Corner reticle brackets on cam
-  const bl = 22;
-  const corners = [[20,20,1,1],[w-20,20,-1,1],[20,h-20,1,-1],[w-20,h-20,-1,-1]];
-  corners.forEach(([cx,cy,dx,dy]) => {
+  // Depth bar (left side)
+  if(isCameraActive&&handsCount>0){
+    const bh=120, bx=16, by=(H-bh)/2;
     ctx.save();
-    ctx.strokeStyle = 'rgba(0,245,255,0.4)';
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 8; ctx.shadowColor = '#00f5ff';
-    ctx.beginPath();
-    ctx.moveTo(cx + dx*bl, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy*bl);
-    ctx.stroke();
-    ctx.restore();
-  });
+    ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(bx,by,10,bh);
+    ctx.fillStyle='rgba(0,229,255,.12)'; ctx.fillRect(bx,by,10,bh);
+    const fill=bh*(handDepth/100);
+    const grd=ctx.createLinearGradient(0,by+bh,0,by);
+    grd.addColorStop(0,'#00e5ff'); grd.addColorStop(1,'#e040fb');
+    ctx.fillStyle=grd; ctx.shadowBlur=8; ctx.shadowColor='#00e5ff';
+    ctx.fillRect(bx,by+bh-fill,10,fill); ctx.shadowBlur=0;
+    ctx.font='7px Orbitron'; ctx.fillStyle='rgba(0,229,255,.5)'; ctx.textAlign='center';
+    ctx.fillText('FAR',bx+5,by-4); ctx.fillText('NEAR',bx+5,by+bh+10); ctx.restore();
+  }
 }
 
-/* ============================================================
-   MEDIAPIPE SETUP
-============================================================ */
-const mpHands = window.Hands || Hands;
-const mpCamera = window.Camera || Camera;
+/* ====================================================================
+   MEDIAPIPE
+==================================================================== */
+const mpHands=window.Hands||Hands, mpCamera=window.Camera||Camera;
+const hands=new mpHands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.72,minTrackingConfidence:.72});
 
-const hands = new mpHands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.72, minTrackingConfidence: 0.72 });
-
-hands.onResults(results => {
-  // FPS
-  const now = Date.now();
+hands.onResults(results=>{
+  const now=Date.now();
+  const latency=now-lastFrameTime; lastFrameTime=now;
   frameCount++; totalFrames++;
-  const latency = now - lastFrameTime;
-  lastFrameTime = now;
-  if (now - lastFpsTime > 1000) {
-    fpsVal = Math.round((frameCount * 1000) / (now - lastFpsTime));
-    frameCount = 0; lastFpsTime = now;
+
+  if(now-lastFpsTime>1000){
+    fps=Math.round((frameCount*1000)/(now-lastFpsTime));
+    if(fps>maxFps) maxFps=fps;
+    fpsSum+=fps; fpsCount++;
+    frameCount=0; lastFpsTime=now;
+    document.getElementById('sess-fps').textContent=fpsCount?Math.round(fpsSum/fpsCount):'—';
+    document.getElementById('sess-mfps').textContent=maxFps||'—';
   }
 
-  const W = 1280, H = 720;
-  canvasElement.width = W; canvasElement.height = H;
+  const W=1280,H=720;
+  camCanvas.width=W; camCanvas.height=H;
+  camCtx.save(); camCtx.clearRect(0,0,W,H);
+  camCtx.translate(W,0); camCtx.scale(-1,1);
+  camCtx.drawImage(results.image,0,0,W,H); camCtx.restore();
 
-  canvasCtx.save();
-  canvasCtx.clearRect(0, 0, W, H);
-  canvasCtx.translate(W, 0); canvasCtx.scale(-1, 1);
-  canvasCtx.drawImage(results.image, 0, 0, W, H);
-  canvasCtx.restore();
+  const handsCount=results.multiHandLandmarks?results.multiHandLandmarks.length:0;
+  neuralActivity=handsCount>0?Math.min(1,.3+handsCount*.5):Math.max(0,neuralActivity-.04);
 
-  const handsCount = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+  if(handsCount>0){
+    lastLandmarks=results.multiHandLandmarks[0];
+    results.multiHandLandmarks.forEach((hand,idx)=>drawHandCanvas(camCtx,hand,W,H,idx));
+    accTarget=90+stabilityScore*.09;
+    update3DHandModel(results.multiHandLandmarks[0]);
 
-  if (handsCount > 0) {
-    confidence = 95 + Math.random() * 5;
-    neuralActivity = Math.min(1, handsCount * 0.6 + 0.2);
-    results.multiHandLandmarks.forEach((hand, idx) => drawHandOverlay(canvasCtx, hand, W, H, idx));
+    // Update gesture panel
+    const g=currentGesture;
+    const gEl=document.getElementById('gest-name');
+    if(gEl.textContent!==g){
+      gEl.style.opacity=0; gEl.style.transform='translateY(-4px)';
+      setTimeout(()=>{gEl.textContent=g;gEl.style.transition='all .25s';gEl.style.opacity=1;gEl.style.transform='translateY(0)'},150);
+      pushGesture(g);
+    }
+    const em=gestEmoji[g]||'🖐️';
+    document.getElementById('gest-icon').textContent=em;
+    document.getElementById('gest-conf-val').textContent=Math.round(90+stabilityScore*.1)+'%';
+    document.getElementById('ov-conf').textContent=Math.round(88+stabilityScore*.11)+'%';
+    document.getElementById('ov-conf').className='ov-val '+(stabilityScore>60?'good':'amber');
+
+    // Motion analytics
+    document.getElementById('ma-speed').textContent=velSmooth.toFixed(0);
+    document.getElementById('ma-stab').textContent=stabilityScore.toFixed(0)+'%';
+    document.getElementById('ma-smooth').textContent=smoothScore.toFixed(0)+'%';
+
+    // Waveform push
+    waveData.push(Math.min(100,velSmooth/5)); if(waveData.length>60) waveData.shift();
+    waveData2.push(stabilityScore); if(waveData2.length>60) waveData2.shift();
+    waveData3.push(smoothScore); if(waveData3.length>60) waveData3.shift();
+
+    // Stability label
+    document.getElementById('ov-stab').textContent=stabilityScore>80?'Excellent':stabilityScore>50?'Good':'Low';
+    document.getElementById('ov-stab').className='ov-val '+(stabilityScore>50?'good':'amber');
+    document.getElementById('ov-qual').textContent=fps>45?'High':fps>25?'Medium':'Low';
+    document.getElementById('ov-qual').className='ov-val '+(fps>45?'good':'amber');
+
   } else {
-    confidence = 0;
-    neuralActivity = Math.max(0, neuralActivity - 0.05);
-    prevWrist = null;
+    lastLandmarks=null;
+    waveData.push(0); if(waveData.length>60) waveData.shift();
+    waveData2.push(0); if(waveData2.length>60) waveData2.shift();
+    waveData3.push(0); if(waveData3.length>60) waveData3.shift();
+    prevWrist=null; handHistory=[];
   }
 
-  drawHUD(canvasCtx, W, H, handsCount);
+  drawCamHUD(camCtx,W,H,handsCount);
 
-  // Update HUD DOM
-  const g = currentGesture;
-  const el = document.getElementById('gesture-label');
-  if (el.textContent !== g) {
-    el.style.opacity = 0;
-    setTimeout(() => { el.textContent = g; el.style.opacity = 1; }, 150);
-  }
-
-  setBar('conf-bar', confidence); setVal('conf-val', confidence.toFixed(0) + '%');
-  setBar('stab-bar', stabilityScore); setVal('stab-val', stabilityScore.toFixed(0) + '%');
-  setBar('depth-bar', currentDepth); setVal('depth-val', currentDepth + '%');
-  const velPct = Math.min(100, velSmooth / 3);
-  setBar('vel-bar', velPct); setVal('vel-val', velSmooth.toFixed(0) + ' px/s');
-
-  document.getElementById('st-hands').textContent = handsCount;
-  document.getElementById('st-fps').textContent = fpsVal;
-  document.getElementById('st-lat').textContent = latency + 'ms';
-  document.getElementById('st-frames').textContent = totalFrames;
-
-  document.getElementById('m-fps').textContent = fpsVal || '—';
-  document.getElementById('m-hands').textContent = handsCount;
-  document.getElementById('m-conf').textContent = handsCount > 0 ? confidence.toFixed(0) + '%' : '—';
-  document.getElementById('m-gest').textContent = handsCount > 0 ? g : 'IDLE';
-  document.getElementById('m-depth').textContent = handsCount > 0 ? currentDepth + '%' : '—';
-
-  // Spark data push
-  sparkData.push(velPct);
-  if (sparkData.length > 80) sparkData.shift();
+  // Update HUD elements
+  document.getElementById('ov-hands').textContent=handsCount;
+  document.getElementById('ov-lm').textContent=(handsCount?21*handsCount:0)+' / '+(handsCount?21*handsCount:0);
+  document.getElementById('tb-fps').textContent=fps||'—';
+  document.getElementById('tb-lat').textContent=fps?latency+'ms':'—';
 
   // Hide cam loading
-  const cl = document.getElementById('cam-loading');
-  if (cl.style.display !== 'none') {
-    cl.style.opacity = 0;
-    setTimeout(() => cl.style.display = 'none', 400);
-  }
+  const cl=document.getElementById('cam-loading');
+  if(cl.style.display!=='none'){cl.style.opacity=0;setTimeout(()=>cl.style.display='none',400)}
 });
 
-const camera = new mpCamera(videoElement, {
-  onFrame: async () => { await hands.send({ image: videoElement }); },
-  width: 1280, height: 720
+const camera=new mpCamera(videoEl,{
+  onFrame:async()=>{await hands.send({image:videoEl})},
+  width:1280,height:720
 });
 
-/* ============================================================
+/* ====================================================================
    CONTROLS
-============================================================ */
-document.getElementById('start-btn').addEventListener('click', () => {
-  const cl = document.getElementById('cam-loading');
-  cl.style.opacity = 1; cl.style.display = 'flex';
+==================================================================== */
+document.getElementById('start-btn').addEventListener('click',()=>{
+  const cl=document.getElementById('cam-loading'); cl.style.opacity=1; cl.style.display='flex';
   camera.start()
-    .then(() => {
-      isCameraActive = true;
-      startTime = Date.now();
-      document.getElementById('output_canvas').style.display = 'block';
-      document.getElementById('placeholder').style.display = 'none';
-      document.getElementById('reticle').style.display = 'none';
-      const badge = document.getElementById('cam-badge');
-      badge.className = 'live';
-      badge.innerHTML = '<span class="status-dot"></span>LIVE TRACKING';
-      document.getElementById('header-mode').textContent = 'MODE: TRACKING';
+    .then(()=>{
+      isCameraActive=true; sessionStart=Date.now();
+      camCanvas.style.display='block';
+      document.getElementById('cam-placeholder').style.display='none';
+      document.getElementById('live-badge').className='live';
+      document.getElementById('live-badge').innerHTML='<span class="status-dot"></span>LIVE TRACKING';
     })
-    .catch(err => {
-      alert('Camera error: ' + err);
-      cl.style.display = 'none';
-    });
+    .catch(err=>{alert('Camera error: '+err);cl.style.display='none'});
 });
+document.getElementById('stop-btn').addEventListener('click',()=>{if(isCameraActive)location.reload()});
+document.getElementById('end-btn').addEventListener('click',()=>{if(isCameraActive)location.reload()});
 
-document.getElementById('stop-btn').addEventListener('click', () => {
-  if (isCameraActive) location.reload();
-});
+// Toolbar toggles
+document.getElementById('btn-neural').addEventListener('click',function(){showNeural=!showNeural;this.classList.toggle('active',showNeural)});
+document.getElementById('btn-mesh').addEventListener('click',function(){showMesh=!showMesh;this.classList.toggle('active',showMesh)});
+document.getElementById('btn-heatmap').addEventListener('click',function(){showHeat=!showHeat;this.classList.toggle('active',showHeat)});
 
-/* ============================================================
-   UPTIME TIMER
-============================================================ */
-function updateUptime() {
-  const diff = isCameraActive ? Date.now() - startTime : 0;
-  const m = Math.floor(diff / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  const str = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  document.getElementById('st-time').textContent = str;
-  document.getElementById('m-uptime').textContent = str;
-}
-setInterval(updateUptime, 1000);
+/* ====================================================================
+   UPTIME + SESSION
+==================================================================== */
+setInterval(()=>{
+  if(!isCameraActive) return;
+  const d=Date.now()-sessionStart;
+  const h=Math.floor(d/3600000), m=Math.floor((d%3600000)/60000), s=Math.floor((d%60000)/1000);
+  const p=n=>String(n).padStart(2,'0');
+  document.getElementById('sess-time').textContent=`${p(h)}:${p(m)}:${p(s)}`;
+  // animate sys metrics
+  const cpu=28+Math.sin(Date.now()*.0005)*8;
+  const gpu=38+Math.sin(Date.now()*.0004)*10;
+  document.getElementById('sm-cpu').textContent=Math.round(cpu)+'%';
+  document.getElementById('sm-gpu').textContent=Math.round(gpu)+'%';
+  document.getElementById('sm-cpu-bar').style.width=cpu+'%';
+  document.getElementById('sm-gpu-bar').style.width=gpu+'%';
+},1000);
 
-/* ============================================================
-   HELPERS
-============================================================ */
-function setBar(id, pct) {
-  document.getElementById(id).style.width = Math.min(100, Math.max(0, pct)) + '%';
-}
-function setVal(id, val) {
-  document.getElementById(id).textContent = val;
-}
+/* ====================================================================
+   ACCURACY RING ANIMATION
+==================================================================== */
+setInterval(()=>{ accVal+=(accTarget-accVal)*.05; drawAccRing(); },30);
 
-/* ============================================================
+/* ====================================================================
    MAIN RENDER LOOP
-============================================================ */
-(function renderLoop() {
-  requestAnimationFrame(renderLoop);
-
-  // Particle canvas
-  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  for (let i = SCREEN_PARTICLES.length - 1; i >= 0; i--) {
-    SCREEN_PARTICLES[i].update();
-    SCREEN_PARTICLES[i].draw();
-    if (SCREEN_PARTICLES[i].life <= 0) SCREEN_PARTICLES.splice(i, 1);
+==================================================================== */
+(function loop(){
+  requestAnimationFrame(loop);
+  // particles
+  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+  for(let i=SPARTS.length-1;i>=0;i--){
+    SPARTS[i].update(); SPARTS[i].draw();
+    if(SPARTS[i].life<=0) SPARTS.splice(i,1);
   }
-
-  // Neural canvas
+  // neural
   drawNeural();
-  if (Math.random() < 0.08) spawnNeuralParticle();
-
-  // Spark canvas
-  drawSpark();
+  if(Math.random()<.1) spawnNPart();
+  // waveform
+  drawWave();
+  // lm3d
+  const lmW=lm3dCanvas.parentElement.offsetWidth||240;
+  const lmH=lm3dCanvas.parentElement.offsetHeight-38||130;
+  if(lm3dCanvas.width!==lmW) lm3dCanvas.width=lmW;
+  if(lm3dCanvas.height!==lmH) lm3dCanvas.height=lmH;
+  drawLM3D();
 })();
 
-window.addEventListener('resize', () => {
-  pCanvas.width = innerWidth; pCanvas.height = innerHeight;
-});
+window.addEventListener('resize',()=>{ pCanvas.width=innerWidth; pCanvas.height=innerHeight; });
 </script>
 </body>
 </html>
